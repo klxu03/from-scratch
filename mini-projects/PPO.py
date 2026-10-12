@@ -101,7 +101,7 @@ class Agent(nn.Module):
         ratio = torch.exp(dist.log_prob(actions) - old_log_probs)
         L_CLIP = torch.minimum(ratio * advantages[mb_indices], torch.clamp(ratio, 1 - EPS, 1 + EPS) * advantages[mb_indices]).mean()
 
-	# Entropy Bonus
+        # Entropy bonus
         L_S = dist.entropy().mean()
 
         # Critic loss
