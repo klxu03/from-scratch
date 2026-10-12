@@ -5,11 +5,13 @@ import torch
 import torch.nn as nn
 from torch.distributions import Distribution, Normal, Independent
 from tqdm.auto import tqdm
+import time
 
-NUM_ENVS = 4
+NUM_ENVS = 8
 TRAJECTORY_SIZE = 256
-# TOTAL_TIMESTEPS = 10_240_000
-TOTAL_TIMESTEPS = 1_000_240
+TOTAL_TIMESTEPS = 4_001_792
+MINIBATCH_SIZE = 256
+NUM_EPOCHS = 8
 GAMMA = 0.99
 EPS = 0.2
 C_1 = 0.5
@@ -63,25 +65,35 @@ class Agent(nn.Module):
     return advantages, td_targets
 
   def learn(self, data):
-    obs, next_obs, terminated, rewards = (torch.stack([torch.as_tensor(d[i]) for d in data]) for i in range(4))
+    data[:] = [torch.stack([torch.as_tensor(d[i]) for d in data]).flatten(0, 1) for i in range(6)]
+    obs, next_obs, terminated, rewards, _, _ = data
+
     advantages, td_targets = self.precompute_advantages(obs, next_obs, terminated, rewards)
-    for i in range(0, TRAJECTORY_SIZE): # eventually randomize this
-      obs, next_obs, terminated, rewards, actions, old_log_probs = data[i]
 
-      # PPO actor loss
-      dist = self.get_action_distribution(obs)
-      ratio = torch.exp(dist.log_prob(actions) - old_log_probs)
-      L_CLIP = torch.minimum(ratio * advantages[i], torch.clamp(ratio, 1 - EPS, 1 + EPS) * advantages[i]).mean()
+    for epoch in range(NUM_EPOCHS):
+      indices = torch.randperm(NUM_ENVS * TRAJECTORY_SIZE)
 
-      L_S = dist.entropy().mean()
+      for start in range(0, NUM_ENVS * TRAJECTORY_SIZE, MINIBATCH_SIZE):
+        mb_indices = indices[start: start + MINIBATCH_SIZE]
 
-      # Critic loss
-      L_VF = 0.5 * ((self.get_value(obs) - td_targets[i])**2).mean()
+        mb_data = [x[mb_indices] for x in data]
 
-      loss = -L_CLIP + C_1 * L_VF - C_2 * L_S
-      self.optimizer.zero_grad()
-      loss.backward()
-      self.optimizer.step()
+        obs, next_obs, terminated, rewards, actions, old_log_probs = mb_data
+   
+        # PPO actor loss
+        dist = self.get_action_distribution(obs)
+        ratio = torch.exp(dist.log_prob(actions) - old_log_probs)
+        L_CLIP = torch.minimum(ratio * advantages[mb_indices], torch.clamp(ratio, 1 - EPS, 1 + EPS) * advantages[mb_indices]).mean()
+
+        L_S = dist.entropy().mean()
+
+        # Critic loss
+        L_VF = 0.5 * ((self.get_value(obs) - td_targets[mb_indices])**2).mean()
+
+        loss = -L_CLIP + C_1 * L_VF - C_2 * L_S
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
 
 # vector_kwargs same step is important, otherwise 100 terminats, 101 is intermediary I'd have to write code to ignore, 102 is the starting state of next obs. Otherwise 102 becomes 101
@@ -90,7 +102,12 @@ agent = Agent(NUM_ENVS, 8, 2)
 
 next_obs, infos = envs.reset()
 
+rollout_time = 0.0
+learn_time = 0.0
+
 for update in tqdm(range(TOTAL_TIMESTEPS // (NUM_ENVS * TRAJECTORY_SIZE)), desc="Training"):
+  start = time.perf_counter()
+
   # [obs, next_obs, terminated, reward, action, old_log_prob]
   data = []
   for step in range(0, TRAJECTORY_SIZE):
@@ -106,5 +123,12 @@ for update in tqdm(range(TOTAL_TIMESTEPS // (NUM_ENVS * TRAJECTORY_SIZE)), desc=
 
     # we can just store dist.log_prob(action) instead of returning entire dist to be more memory efficient. For PPO we need pi_new/pi_old = e^(pi_new_log - pi_old_log)
     data.append([obs, transition_next_obs, terminated, rewards, actions, dist.log_prob(actions)])
-  agent.learn(data)
+  rollout_time += time.perf_counter() - start
 
+  start = time.perf_counter()
+  agent.learn(data)
+  learn_time += time.perf_counter() - start
+
+total_time = rollout_time + learn_time
+print(f"Rollout: {rollout_time / total_time:.1%} ({rollout_time:.1f}s)")
+print(f"Learning: {learn_time / total_time:.1%} ({learn_time:.1f}s)")
