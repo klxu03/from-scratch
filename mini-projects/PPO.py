@@ -1,4 +1,16 @@
-# https://huggingface.co/learn/deep-rl-course/unit8/hands-on-cleanrl
+"""
+https://huggingface.co/learn/deep-rl-course/unit8/hands-on-cleanrl
+
+On Colab:
+Rollout: 57.5% (3032.0s)
+Learning: 42.5% (2243.1s)
+
+Evaluation on 100 Episodes:
+Mean reward: 270.13
+Std reward:  20.68
+Min reward:  224.30
+Max reward:  323.73
+"""
 
 import gymnasium as gym
 import torch
@@ -9,9 +21,9 @@ import time
 
 NUM_ENVS = 8
 TRAJECTORY_SIZE = 256
-TOTAL_TIMESTEPS = 4_001_792
+TOTAL_TIMESTEPS = 8_003_584
 MINIBATCH_SIZE = 256
-NUM_EPOCHS = 8
+NUM_EPOCHS = 16
 GAMMA = 0.99
 EPS = 0.2
 C_1 = 0.5
@@ -28,7 +40,9 @@ class Agent(nn.Module):
     self.actor = nn.Sequential(
         nn.Linear(input_dim, 64),
         nn.Tanh(),
-        nn.Linear(64, 64),
+        nn.Linear(64, 128),
+        nn.Tanh(),
+        nn.Linear(128, 64),
         nn.Tanh(),
         nn.Linear(64, output_dim),
     )
@@ -37,7 +51,9 @@ class Agent(nn.Module):
     self.value = nn.Sequential(
         nn.Linear(input_dim, 64),
         nn.Tanh(),
-        nn.Linear(64, 64),
+        nn.Linear(64, 128),
+        nn.Tanh(),
+        nn.Linear(128, 64),
         nn.Tanh(),
         nn.Linear(64, 1),
     )
