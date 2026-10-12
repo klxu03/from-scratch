@@ -71,8 +71,8 @@ class Agent(nn.Module):
 
   def precompute_advantages(self, obs: torch.Tensor, next_obs: torch.Tensor, terminated: torch.Tensor, rewards: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.no_grad():
-      old_values = self.get_value(obs) # (256, 4)
-      next_values = self.get_value(next_obs) # (256, 4)
+      old_values = self.get_value(obs)
+      next_values = self.get_value(next_obs)
       next_values = next_values.masked_fill(terminated, 0.0)
     
     td_targets = rewards + GAMMA * next_values
@@ -101,6 +101,7 @@ class Agent(nn.Module):
         ratio = torch.exp(dist.log_prob(actions) - old_log_probs)
         L_CLIP = torch.minimum(ratio * advantages[mb_indices], torch.clamp(ratio, 1 - EPS, 1 + EPS) * advantages[mb_indices]).mean()
 
+	# Entropy Bonus
         L_S = dist.entropy().mean()
 
         # Critic loss
