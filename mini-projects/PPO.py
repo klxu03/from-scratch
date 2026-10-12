@@ -113,7 +113,7 @@ class Agent(nn.Module):
         self.optimizer.step()
 
 
-# vector_kwargs same step is important, otherwise 100 terminats, 101 is intermediary I'd have to write code to ignore, 102 is the starting state of next obs. Otherwise 102 becomes 101
+# vector_kwargs same step is important, otherwise 100 terminates, 101 is intermediary state I'd have to ignore, 102 is the starting state of next obs. Now no 101, just 100 -> 102
 envs = gym.make_vec("LunarLander-v3", num_envs=NUM_ENVS, vectorization_mode="async", continuous=True, enable_wind=True, vector_kwargs={"autoreset_mode": gym.vector.AutoresetMode.SAME_STEP})
 agent = Agent(NUM_ENVS, 8, 2)
 
