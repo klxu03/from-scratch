@@ -61,7 +61,7 @@ def verify_solution(expression: str) -> bool:
 
 	return Counter(numbers_used) == Counter(INPUT_NUMBERS)
 
-MODEL = "Qwen/Qwen3.5-0.8B"
+MODEL = "Qwen/Qwen3.5-4B"
 MAX_OUTPUT_TOKENS = 4_096
 
 # (8*(9/(1+2)))
