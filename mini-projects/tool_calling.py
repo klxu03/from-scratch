@@ -14,6 +14,12 @@ from collections import Counter
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils.prompts import prompt
 
+MODEL = "Qwen/Qwen3.5-0.8B"
+MAX_OUTPUT_TOKENS = 4_096
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL)
+model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to("mps").eval()
+
 def calculator(expression: str) -> str:
 	# Must give docstring of this type with Args info
     """Evaluate an arithmetic expression using +, -, *, / and parentheses.
@@ -50,7 +56,7 @@ def calculator(expression: str) -> str:
 
     return str(evaluate(tree.body))
 
-def verify_solution(expression: str) -> bool:
+def verify_solution(expression: str, puzzle: list[int]) -> bool:
 	tree = ast.parse(expression, mode="eval")
 
 	numbers_used = [
@@ -59,29 +65,13 @@ def verify_solution(expression: str) -> bool:
 		if isinstance(node, ast.Constant) and type(node.value) is int
 	]
 
-	return Counter(numbers_used) == Counter(INPUT_NUMBERS)
+	return Counter(numbers_used) == Counter(puzzle)
 
-MODEL = "Qwen/Qwen3.5-4B"
-MAX_OUTPUT_TOKENS = 4_096
-
-# (8*(9/(1+2)))
-# (3*((3*5)-7))
-# 8/(3 - (8/3))
-INPUT_NUMBERS = [5, 3, 3, 7]
-# INPUT_NUMBERS = [1, 8, 2, 9]
-
-prompt = prompt(MAX_OUTPUT_TOKENS, INPUT_NUMBERS)
-
-tokenizer = AutoTokenizer.from_pretrained(MODEL)
-model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to("mps").eval()
-
-num_successes= []
-progress = tqdm(range(100), desc="Running episodes")
-for i in progress:
-	progress.set_postfix(successes=len(num_successes), refresh=False)
+def run_episode(puzzle: list[int]) -> str | None:
+	prompt_text = prompt(MAX_OUTPUT_TOKENS, puzzle)
 	TOKENS_USED = 0
 	turn = 0
-	messages = [{"role": "user", "content": prompt}]
+	messages = [{"role": "user", "content": prompt_text}]
 
 	while TOKENS_USED < MAX_OUTPUT_TOKENS:
 		turn += 1
@@ -132,16 +122,27 @@ for i in progress:
 				continue
 
 			print(f"Calculator {expression} = {result}")
-			if result == "24" and verify_solution(expression):
+			if result == "24" and verify_solution(expression, puzzle):
 				print(f"Found a valid solution: {expression}")
-				num_successes.append(expression)
-				TOKENS_USED = MAX_OUTPUT_TOKENS + 1
-				break
+				return expression
 
 			messages.append({
 				"role": "tool",
 				"content": f"{expression} = {result}"
 			})
+
+# (8*(9/(1+2))) # 0.8b got it about ~50% of the time
+# (3*((3*5)-7)) # 0.8b got it 1/96 times took 44m, 4b got it 18/100 times took 3h
+# 8/(3 - (8/3)) # 0.8b got it 1/42 times, 4b got it 9/23 times
+INPUT_NUMBERS = [6, 6, 6, 6]
+
+num_successes= []
+progress = tqdm(range(1), desc="Running episodes")
+for i in progress:
+	progress.set_postfix(successes=len(num_successes), refresh=False)
+	res = run_episode(INPUT_NUMBERS)
+	if res:
+		num_successes.append(res)
 
 print(f"Number of successes: {len(num_successes)}")
 print(f"Successes: {num_successes}")

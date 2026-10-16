@@ -135,7 +135,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "torch" },
-    { name = "tqdm", specifier = ">=4.70.1" },
+    { name = "tqdm" },
     { name = "transformers" },
 ]
 

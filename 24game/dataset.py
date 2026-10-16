@@ -5,6 +5,9 @@ from itertools import combinations_with_replacement, combinations
 import sympy
 import re
 from tqdm import tqdm
+from pathlib import Path
+import numpy as np
+from math import ceil
 
 class Term(NamedTuple):
     value: Fraction
@@ -47,32 +50,72 @@ def evaluate(terms: list[Term]) -> list[Term]:
     return results
 
 def canonical(expr: str):
-    symbolic = re.sub(
-        r"\d+",
-        lambda m: f"x{m.group()}",
-        expr
-    )
-    return sympy.cancel(sympy.sympify(symbolic))
+    return sympy.srepr(sympy.sympify(expr, evaluate=False))
 
-input = [Term(Fraction(x), str(x)) for x in [8, 3, 8, 3]]
-res = evaluate(input)
-unique = {}
+def uses_fraction(expr: str) -> bool:
+    while m := re.search(r"\(([^()]+)\)", expr):
+        left, op, right = m.group(1).split()
+        value = {"+": ops.add, "-": ops.sub, "*": ops.mul, "/": ops.truediv}[op](Fraction(left), Fraction(right))
+        if value.denominator != 1:
+            return True
+        expr = expr.replace(m.group(0), str(value), 1)
+    return False
 
-for r in res:
-    unique[canonical(r.expr)] = r.expr
-for v in unique.values():
-    print(v)
+def generate_dataset():
+    puzzles = list(combinations_with_replacement(range(1, 14), 4))
 
-puzzles = list(combinations_with_replacement(range(1, 14), 4))
+    easy = [] # remaining
+    medium = [] # only one answer
+    hard = [] # one answer that needs fractions
 
-num_solutions = 0
-total_unique_num_solutions = 0
+    for puzzle in tqdm(puzzles):
+        input = [Term(Fraction(x), str(x)) for x in puzzle]
+        res = evaluate(input)
+        unique = {}
+        for r in res:
+            unique[canonical(r.expr)] = r.expr
 
-for puzzle in tqdm(puzzles):
-    input = [Term(Fraction(x), str(x)) for x in puzzle]
-    res = evaluate(input)
-    num_solutions += (len(res) > 0)
-    unique = {canonical(r.expr) for r in res}
-    total_unique_num_solutions += len(unique)
+        if len(res) == 0 or len(unique.values()) > 1:
+            if len(res) > 0: easy.append(puzzle)
+            continue
 
-print(f"num_solutions = {num_solutions} out of {len(puzzles)}, avg_unique_num_solutions = {total_unique_num_solutions / num_solutions}")
+        if uses_fraction(next(iter(unique.values()))):
+            hard.append(puzzle)
+        else:
+            medium.append(puzzle)
+
+    print(f"easy: {len(easy)}, medium: {len(medium)}, hard: {len(hard)}")
+
+    data_dir = Path(__file__).resolve().parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    for name, puzzles in [("easy", easy), ("medium", medium), ("hard", hard)]:
+        path = data_dir / f"{name}.jsonl"
+        path.write_text(
+            "".join(" ".join(map(str, puzzle)) + "\n" for puzzle in puzzles),
+            encoding="utf-8",
+        )
+
+def split_dataset():
+    val_percentage = 0.1
+    test_percentage = 0.1
+
+    data_dir = Path(__file__).resolve().parent / "data"
+    for name in ["easy", "medium", "hard"]:
+        path = data_dir / f"{name}.jsonl"
+        puzzles = [
+            list(map(int, line.split()))
+            for line in path.read_text().splitlines()
+            if line.strip()
+        ]
+        np.random.shuffle(puzzles)
+        val_count = ceil(len(puzzles) * val_percentage)
+        test_count = ceil(len(puzzles) * test_percentage)
+        val_puzzles = puzzles[:val_count]
+        test_puzzles = puzzles[val_count:val_count + test_count]
+        train_puzzles = puzzles[val_count + test_count:]
+
+        for puzzles, split in [(train_puzzles, "train"), (val_puzzles, "val"), (test_puzzles, "test")]:
+            with open(data_dir / f"{split}.jsonl", "a") as f:
+                for puzzle in puzzles:
+                    f.write(" ".join(map(str, puzzle)) + "\n")
