@@ -131,6 +131,7 @@ def run_episode(puzzle: list[int]) -> str | None:
 				"content": f"{expression} = {result}"
 			})
 
+"""
 # (8*(9/(1+2))) # 0.8b got it about ~50% of the time
 # (3*((3*5)-7)) # 0.8b got it 1/96 times took 44m, 4b got it 18/100 times took 3h
 # 8/(3 - (8/3)) # 0.8b got it 1/42 times, 4b got it 9/23 times
@@ -146,3 +147,52 @@ for i in progress:
 
 print(f"Number of successes: {len(num_successes)}")
 print(f"Successes: {num_successes}")
+"""
+
+import csv
+import random
+
+DATA_DIR = Path(__file__).resolve().parents[1] / "24game/data"
+RESULTS_PATH = Path(__file__).with_name("results.csv")
+
+NUM_PUZZLES = 4
+NUM_TRIALS = 10
+
+selected = []
+
+for difficulty in ["easy", "medium", "hard"]:
+    path = DATA_DIR / f"{difficulty}.jsonl"
+    puzzles = [
+        list(map(int, line.split()))
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
+
+    selected.extend(
+        (numbers, difficulty)
+        for numbers in random.sample(puzzles, NUM_PUZZLES)
+    )
+
+with RESULTS_PATH.open("w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["problem", "difficulty", f"successes/{NUM_TRIALS}"])
+
+    progress = tqdm(total=len(selected) * NUM_TRIALS, desc="Evaluating")
+
+    for numbers, difficulty in selected:
+        successes = 0
+
+        for _ in range(NUM_TRIALS):
+            successes += run_episode(numbers) is not None
+            progress.update(1)
+            progress.set_postfix(
+                puzzle=str(numbers),
+                successes=successes,
+            )
+
+        writer.writerow([" ".join(map(str, numbers)), difficulty, successes])
+        f.flush()  # Save each puzzle's results immediately
+
+    progress.close()
+
+print(f"Results saved to {RESULTS_PATH}")
