@@ -67,7 +67,7 @@ def verify_solution(expression: str, puzzle: list[int]) -> bool:
 
 	return Counter(numbers_used) == Counter(puzzle)
 
-def extend_cached_ids(prefix_ids: torch.Tensor, suffix: str) -> torch.Tensor | None:
+def extend_cached_ids(prefix_ids: torch.Tensor, suffix: str) -> torch.Tensor:
 	"""Append suffix tokens without changing the ids the cache was built from."""
 	prefix = prefix_ids[0].tolist()
 	prefix_text = tokenizer.decode(prefix, skip_special_tokens=False)
@@ -87,58 +87,50 @@ def continuation_suffix(prefix_ids: torch.Tensor, tool_results: list[str]) -> st
 		tools = f"<|im_start|>user{tools}<|im_end|>\n"
 	return close + tools + "<|im_start|>assistant\n<think>\n"
 
+def render_prompt(messages: list[dict]) -> torch.Tensor:
+	return tokenizer.apply_chat_template(
+		messages,
+		tools=[calculator],
+		tokenize=True,
+		add_generation_prompt=True,
+		enable_thinking=True,
+		return_dict=True,
+		return_tensors="pt",
+	).to("mps")["input_ids"]
+
 def run_episode(puzzle: list[int]) -> str | None:
 	prompt_text = prompt(MAX_OUTPUT_TOKENS, puzzle)
-	TOKENS_USED = 0
 	turn = 0
 	messages = [{"role": "user", "content": prompt_text}]
 	cache = None
-	next_ids = None
+	input_ids = render_prompt(messages)
 
-	while TOKENS_USED < MAX_OUTPUT_TOKENS:
+	while input_ids.shape[1] < MAX_OUTPUT_TOKENS:
 		turn += 1
-
-		if next_ids is None:
-			inputs = tokenizer.apply_chat_template(
-				messages,
-				tools=[calculator],
-				tokenize=True,
-				add_generation_prompt=True,
-				enable_thinking=True,
-				return_dict=True,
-				return_tensors="pt",
-			).to("mps")
-		else:
+		if cache is not None:
 			print(f"Cache hit at turn {turn}")
-			inputs = {
-				"input_ids": next_ids,
-				"attention_mask": torch.ones_like(next_ids),
-			}
-
-		input_ids = inputs["input_ids"]
 
 		with torch.inference_mode():
 			outputs = model.generate(
-				**inputs,
+				input_ids=input_ids,
+				attention_mask=torch.ones_like(input_ids),
 				past_key_values=cache,
 				return_dict_in_generate=True,
-				max_new_tokens=MAX_OUTPUT_TOKENS - TOKENS_USED,
+				max_new_tokens=MAX_OUTPUT_TOKENS - input_ids.shape[1],
 				do_sample=True, temperature=1.0, top_k=20,
 				top_p=0.95, repetition_penalty=1.1,
 			)
 
-		cache = outputs.past_key_values
 		sequences = outputs.sequences
 		raw_response = sequences[0, input_ids.shape[1]:]
 		text = tokenizer.decode(raw_response, skip_special_tokens=True)
-		TOKENS_USED += raw_response.numel()
 
 		messages.append({
 			"role": "assistant",
 			"content": text
 		})
 
-		print(f"\nGenerated tokens: {TOKENS_USED} / {MAX_OUTPUT_TOKENS} on turn {turn}")
+		print(f"\nTokens: {sequences.shape[1]} / {MAX_OUTPUT_TOKENS} on turn {turn}")
 		print("Finished thinking:", "</think>" in text)
 		print("Output:", text)
 
@@ -170,17 +162,24 @@ def run_episode(puzzle: list[int]) -> str | None:
 			})
 
 		next_ids = extend_cached_ids(sequences, continuation_suffix(sequences, tool_results))
+		cache = outputs.past_key_values
+		input_ids = next_ids
+
 		if next_ids is None:
 			print(f"Cache mismatch after turn {turn}")
 			cache = None
+			input_ids = render_prompt(messages)
+		else:
+			cache = outputs.past_key_values
+			input_ids = next_ids
 
 # (8*(9/(1+2))) # 0.8b got it about ~50% of the time
 # (3*((3*5)-7)) # 0.8b got it 1/96 times took 44m, 4b got it 18/100 times took 3h
 # 8/(3 - (8/3)) # 0.8b got it 1/42 times, 4b got it 9/23 times
-INPUT_NUMBERS = [8, 1, 2, 9]
+INPUT_NUMBERS = [6, 6, 6, 6]
 
 num_successes= []
-progress = tqdm(range(100), desc="Running episodes")
+progress = tqdm(range(5), desc="Running episodes")
 for i in progress:
 	progress.set_postfix(successes=len(num_successes), refresh=False)
 	res = run_episode(INPUT_NUMBERS)
