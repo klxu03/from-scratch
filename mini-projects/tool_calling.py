@@ -176,10 +176,10 @@ def run_episode(puzzle: list[int]) -> str | None:
 # (8*(9/(1+2))) # 0.8b got it about ~50% of the time
 # (3*((3*5)-7)) # 0.8b got it 1/96 times took 44m, 4b got it 18/100 times took 3h
 # 8/(3 - (8/3)) # 0.8b got it 1/42 times, 4b got it 9/23 times
-INPUT_NUMBERS = [6, 6, 6, 6]
+INPUT_NUMBERS = [8, 1, 2, 9]
 
 num_successes= []
-progress = tqdm(range(5), desc="Running episodes")
+progress = tqdm(range(100), desc="Running episodes")
 for i in progress:
 	progress.set_postfix(successes=len(num_successes), refresh=False)
 	res = run_episode(INPUT_NUMBERS)
