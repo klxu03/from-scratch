@@ -89,12 +89,13 @@ def generate_dataset():
     data_dir = Path(__file__).resolve().parent / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    for name, puzzles in [("easy", easy), ("medium", medium), ("hard", hard)]:
-        path = data_dir / f"{name}.jsonl"
-        path.write_text(
-            "".join(" ".join(map(str, puzzle)) + "\n" for puzzle in puzzles),
-            encoding="utf-8",
-        )
+    for name, group in [("easy", easy), ("medium", medium), ("hard", hard)]:
+        lines = []
+        for puzzle in group:
+            order = list(puzzle)
+            np.random.shuffle(order)
+            lines.append(" ".join(map(str, order)) + "\n")
+        (data_dir / f"{name}.jsonl").write_text("".join(lines), encoding="utf-8")
 
 def split_dataset():
     val_percentage = 0.1
@@ -119,3 +120,7 @@ def split_dataset():
             with open(data_dir / f"{split}.jsonl", "a") as f:
                 for puzzle in puzzles:
                     f.write(" ".join(map(str, puzzle)) + "\n")
+
+if __name__ == "__main__":
+    generate_dataset()
+    split_dataset()
