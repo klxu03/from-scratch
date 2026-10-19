@@ -127,7 +127,7 @@ if __name__ == "__main__":
     model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to("mps").eval()
     actor = Actor(model)
     puzzles = [[6, 6, 6, 6], [8, 1, 2, 9], [3, 5, 3, 7], [8, 3, 3, 8]]
-    group_size = 100
+    group_size = 10
     rollouts = actor.collect_rollouts(puzzles, group_size=group_size)
     for puzzle, group in zip(puzzles, rollouts):
         successes = sum(rollout.reward for rollout in group)
