@@ -9,7 +9,7 @@ from pathlib import Path
 class Learner:
     def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096):
         self.model = model
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-6)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=3e-6)
         self.max_output_tokens = max_output_tokens
         self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
 

@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 *.csv
+*.run
 
 # ML Outputs
 runs/

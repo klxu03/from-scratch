@@ -3,6 +3,7 @@ from transformers import AutoTokenizer, Qwen3_5ForCausalLM
 from transformers.generation.utils import GenerateOutput
 from env import calculator, verify_solution, execute_tools
 from typing import NamedTuple
+from tqdm import tqdm
 
 import sys
 from pathlib import Path
@@ -93,8 +94,7 @@ class Actor:
         for puzzle in puzzles:
             ret.append([])
             prompt_text = prompt(self.max_output_tokens, puzzle)
-            for _ in range(group_size):
-                print(f"Collecting rollout {_ + 1} of {group_size} for puzzle {puzzle}")
+            for _ in tqdm(range(group_size), desc=f"Collecting {group_size} rollouts for puzzle {puzzle}"):
                 turns: list[Turn] = []
                 input_ids = self.tokenizer.apply_chat_template(
                     [{"role": "user", "content": prompt_text}],
