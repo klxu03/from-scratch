@@ -59,17 +59,17 @@ class Learner:
 
         for i, rollout in enumerate(rollout_group):
             print(f"This rollout has {len(rollout.turns)} turns")
-            token_ids = torch.cat([prompt_ids, *[turn.token_ids for turn in rollout.turns]], dim=1).to("mps")
+            token_ids = torch.cat([prompt_ids, *[turn.token_ids for turn in rollout.turns]], dim=1).to(self.model.device)
             action_mask = torch.cat([
-                torch.zeros(prompt_ids.shape[1]).bool(),
+                torch.zeros(prompt_ids.shape[1], dtype=torch.bool),
                 *[
                     torch.cat([
-                        torch.zeros(turn.completion_start).bool(),
-                        torch.ones(turn.token_ids.shape[1] - turn.completion_start).bool(),
+                        torch.zeros(turn.completion_start, dtype=torch.bool),
+                        torch.ones(turn.token_ids.shape[1] - turn.completion_start, dtype=torch.bool),
                     ])
                     for turn in rollout.turns
                 ],
-            ]).to("mps")
+            ]).to(self.model.device)
 
             with torch.no_grad(), self.model.disable_lora():
                 ref_logprobs = self.compute_action_logprobs(token_ids, action_mask)
@@ -110,13 +110,18 @@ class Learner:
 
         with torch.no_grad():
             for name, weight in checkpoint["lora"].items():
-                params[name].copy_(weight)
+                params[name].copy_(weight.to(self.model.device))
 
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+        for state in self.optimizer.state.values():
+            for key, value in state.items():
+                if torch.is_tensor(value):
+                    state[key] = value.to(self.model.device)
 
 if __name__ == "__main__":
     from actor import Actor
-    model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to("mps")
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device)
     model = apply_lora(model)
     actor = Actor(model, 1024)
     sample_rollout = actor.collect_rollouts([[6, 6, 6, 6]], 8)[0]

@@ -16,7 +16,13 @@ import time
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 2048
-model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to("mps")
+# Only place the training device is chosen. Actor and learner follow model.device.
+DEVICE = (
+    torch.device("cuda") if torch.cuda.is_available()
+    else torch.device("mps") if torch.backends.mps.is_available()
+    else torch.device("cpu")
+)
+model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
 actor = Actor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
@@ -75,10 +81,10 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
     cumulated_rewards = []
     cumulated_reward_path = Path(__file__).resolve().parent / "checkpoints" / "cumulated_reward.jpg"
 
-    log_memory(0, "initialized")
+    log_memory(0, "initialized", model.device)
 
     for epoch in tqdm(range(EPOCHS), desc="Epochs of GRPO Training"):
-        for start in tqdm(range(starting_index, len(train_data), BATCH_SIZE), desc=f"Epoch {epoch} of GRPO Training"):
+        for start in tqdm(range(starting_index, len(train_data), BATCH_SIZE), desc=f"Running epoch {epoch} of GRPO Training"):
             training_batch = train_data[start:start + BATCH_SIZE]
             learner.zero_grad()
 
@@ -86,37 +92,55 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
             for i, rollout_group in enumerate(rollouts):
                 learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * BATCH_SIZE)
             cumulated_reward = learner.step()
-            log_memory((start // BATCH_SIZE) + 1)
+            log_memory((start // BATCH_SIZE) + 1, device=model.device)
             cumulated_rewards.append(cumulated_reward)
             print(f"Cumulated reward: {cumulated_reward}")
 
             create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
-            torch.mps.empty_cache()
-            log_memory((start // BATCH_SIZE) + 1, "after_empty_cache")
+            empty_device_cache(model.device)
+            log_memory((start // BATCH_SIZE) + 1, "after_empty_cache", model.device)
 
             if start % 1 == 0:
                 learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{epoch * len(train_data) + start}.pt")
 
     create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
-    log_memory(len(train_data), "finished")
+    log_memory(len(train_data), "finished", model.device)
     learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / "final.pt")
 
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
 _PROCESS = psutil.Process()
-def log_memory(step: int, phase: str = "after_step") -> dict:
+
+def empty_device_cache(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    elif device.type == "mps":
+        torch.mps.empty_cache()
+
+def _device_memory(device: torch.device) -> tuple[int, int]:
+    """Bytes in live tensors, and bytes reserved from the driver by the caching allocator."""
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+        return torch.cuda.memory_allocated(device), torch.cuda.memory_reserved(device)
+    if device.type == "mps":
+        torch.mps.synchronize()
+        return torch.mps.current_allocated_memory(), torch.mps.driver_allocated_memory()
+    return 0, 0
+
+def log_memory(step: int, phase: str = "after_step", device: torch.device | None = None) -> dict:
     """Record memory without clearing gradients, objects, or caches."""
-    torch.mps.synchronize()
+    if device is None:
+        device = model.device
+    live, reserved = _device_memory(device)
 
     gib = 2**30
     vm = psutil.virtual_memory()
     swap = psutil.swap_memory()
-    live = torch.mps.current_allocated_memory()
-    driver = torch.mps.driver_allocated_memory()
 
     sizes = {
-        "mps_live_gib": live / gib,
-        "mps_driver_gib": driver / gib,
-        "mps_gap_gib": (driver - live) / gib,
+        "device": str(device),
+        "device_allocated_gib": live / gib,
+        "device_reserved_gib": reserved / gib,
+        "device_gap_gib": (reserved - live) / gib,
         "process_rss_gib": _PROCESS.memory_info().rss / gib,
         "system_total_gib": vm.total / gib,
         "system_available_gib": vm.available / gib,
@@ -152,6 +176,7 @@ if __name__ == "__main__":
     Overfit on [6, 6, 6, 6]: 30/137
     """
 
+    """
     # sanity_path = Path(__file__).resolve().parent / "data/sanity.jsonl"
     sanity_path = Path(__file__).resolve().parent / "data/val.jsonl"
     print("Evaluating base model")
@@ -161,5 +186,6 @@ if __name__ == "__main__":
     final_success_count, final_reward = eval(checkpoint_path, sanity_path)
     print(f"Base model: success count {base_success_count}, reward {base_reward}")
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
+    """
 
-    # train()
+    train()

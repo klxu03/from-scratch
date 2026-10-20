@@ -57,7 +57,7 @@ class Actor:
         """
         original_input_length = input_ids.shape[1]
         prompt_ids = self.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")["input_ids"]
-        input_ids = torch.cat([input_ids, prompt_ids.to(input_ids.device)], dim=1)
+        input_ids = torch.cat([input_ids, prompt_ids.to(self.model.device)], dim=1)
 
         with torch.inference_mode():
             outputs = self.model.generate(
@@ -90,6 +90,7 @@ class Actor:
         )
 
     def execute_first_turn(self, prompt_ids: torch.Tensor, puzzle: list[int], group_size: int) -> list[ExecutionResult]:
+        prompt_ids = prompt_ids.to(self.model.device)
         with torch.inference_mode():
             sequences = self.model.generate(
                 input_ids=prompt_ids,
@@ -138,14 +139,14 @@ class Actor:
                 enable_thinking=True,
                 return_dict=True,
                 return_tensors="pt",
-            ).to("mps")["input_ids"]
+            ).to(self.model.device)["input_ids"]
 
             first_turns = self.execute_first_turn(prompt_ids, puzzle, group_size)
 
             group = []
             for curr_exec in tqdm(first_turns, desc=f"Finishing rollouts for {puzzle}"):
                 turns = [curr_exec.turn]
-                input_ids = torch.cat([prompt_ids, curr_exec.turn.token_ids.to("mps")], dim=1)
+                input_ids = torch.cat([prompt_ids, curr_exec.turn.token_ids.to(self.model.device)], dim=1)
 
                 found_sol = any(verify_solution(result, puzzle) for result in curr_exec.tool_results)
                 while not found_sol:
@@ -155,13 +156,15 @@ class Actor:
 
                     curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
                     turns.append(curr_exec.turn)
-                    input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to("mps")], dim=1)
+                    input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to(self.model.device)], dim=1)
                     found_sol = any(verify_solution(result, puzzle) for result in curr_exec.tool_results)
                 group.append(Rollout(turns=turns, reward=found_sol))
+                print(f"Found solution: {found_sol} for puzzle {puzzle}\n")
             ret.append(group)
         return ret
 if __name__ == "__main__":
-    model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to("mps").eval()
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device).eval()
     actor = Actor(model)
     puzzles = [[8, 3, 8, 3]]
     group_size = 8
