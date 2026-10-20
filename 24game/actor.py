@@ -108,7 +108,7 @@ class Actor:
                 curr_exec = ExecutionResult(turn=None, cache=None, next_prompt="", tool_results=[])
                 found_sol = False
                 while not found_sol and input_ids.shape[1] < self.max_output_tokens:
-                    print(f"New turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens")
+                    print(f"\nNew turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens")
                     try:
                         curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
                     except Exception as e:
