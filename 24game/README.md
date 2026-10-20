@@ -8,19 +8,34 @@ From a base model, this project applies LoRA finetuning on a custom generate dat
 
 From the repo root, install Python 3.14 and dependencies into `.venv`:
 ```bash
-uv sync
+uv sync --locked --python 3.14 --extra cuda
+```
+or on Mac without CUDA just run:
+```bash
+uv sync --locked
+```
+
+To verify CUDA and accelerated libraries
+```bash
+uv run --locked --extra cuda python -c "import torch, causal_conv1d, fla; print(torch.cuda.get_device_name())"
 ```
 
 ## Generate the dataset
 ```bash
-uv run 24game/dataset.py
+uv run --locked 24game/dataset.py
 ```
 
 This writes `24game/data/easy.jsonl`, `24game/data/medium.jsonl`, and `24game/data/hard.jsonl`, then splits them into `24game/data/train.jsonl`, `24game/data/val.jsonl`, and `24game/data/test.jsonl`. The split files are opened in append mode, so run this once. Inside the `split_dataset()` method you can configure the percentage of data to be in validation and test.
 
 ## Train
+On CUDA:
 ```bash
-uv run 24game/train.py
+uv run --locked --extra cuda python 24game/train.py
+```
+
+On Mac:
+```bash
+uv run python 24game/dataset.py
 ```
 
 The first run downloads `Qwen/Qwen3.5-0.8B`. Training uses CUDA when it is available, otherwise MPS, otherwise CPU. Checkpoints and the reward plot are written to `24game/checkpoints/`.

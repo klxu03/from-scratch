@@ -10,5 +10,18 @@ dependencies = [
     "transformers",
 ]
 
+[project.optional-dependencies]
+cuda = [
+    "causal-conv1d==1.7.0+cu.13.0.torch.2.14 ; platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "flash-linear-attention[cuda]>=0.5.2 ; platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+
+[[tool.uv.index]]
+name = "astral-cu130"
+url = "https://wheels.astral.sh/simple/cu130/"
+
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+causal-conv1d = { index = "astral-cu130" }

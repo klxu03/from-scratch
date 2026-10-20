@@ -38,6 +38,8 @@ class Actor:
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
+        self.model.generation_config.eos_token_id = self.tokenizer.eos_token_id
+        self.model.generation_config.pad_token_id = self.tokenizer.pad_token_id
 
     def continuation_suffix(self, prefix_ids: torch.Tensor, tool_results: list[str]) -> str:
         ids = prefix_ids[0].tolist()

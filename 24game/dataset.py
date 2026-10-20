@@ -8,6 +8,10 @@ from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 from math import ceil
+import random
+
+SEED = 42
+rng = random.Random(SEED)
 
 class Term(NamedTuple):
     value: Fraction
@@ -62,14 +66,16 @@ def uses_fraction(expr: str) -> bool:
     return False
 
 def generate_dataset():
-    puzzles = list(combinations_with_replacement(range(1, 14), 4))
+    puzzles = sorted(combinations_with_replacement(range(1, 14), 4))
+    rng.shuffle(puzzles)
+    puzzles = [rng.sample(puzzle, len(puzzle)) for puzzle in puzzles]
 
     easy = [] # remaining
     medium = [] # only one answer
     hard = [] # one answer that needs fractions
 
     for puzzle in tqdm(puzzles):
-        input = [Term(Fraction(x), str(x)) for x in puzzle]
+        input = [Term(Fraction(x), str(x)) for x in sorted(puzzle)]
         res = evaluate(input)
         unique = {}
         for r in res:
@@ -92,9 +98,7 @@ def generate_dataset():
     for name, group in [("easy", easy), ("medium", medium), ("hard", hard)]:
         lines = []
         for puzzle in group:
-            order = list(puzzle)
-            np.random.shuffle(order)
-            lines.append(" ".join(map(str, order)) + "\n")
+            lines.append(" ".join(map(str, puzzle)) + "\n")
         (data_dir / f"{name}.jsonl").write_text("".join(lines), encoding="utf-8")
 
 def split_dataset():
