@@ -107,7 +107,8 @@ class Actor:
                 ).to("mps")["input_ids"]
                 curr_exec = ExecutionResult(turn=None, cache=None, next_prompt="", tool_results=[])
                 found_sol = False
-                while not found_sol and input_ids.shape[1] < self.max_output_tokens:
+                suffix_len = 0
+                while not found_sol and input_ids.shape[1] + suffix_len < self.max_output_tokens:
                     print(f"\nNew turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens\n")
                     try:
                         curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
@@ -118,6 +119,7 @@ class Actor:
                     input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to(input_ids.device)], dim=1)
                     for tool_result in curr_exec.tool_results:
                         found_sol = found_sol or verify_solution(tool_result, puzzle)
+                    suffix_len = len(self.tokenizer.encode(curr_exec.next_prompt, add_special_tokens=False))
                 print(f"Found solution: {found_sol}")
                 ret[-1].append(Rollout(turns=turns, reward=found_sol))
         return ret

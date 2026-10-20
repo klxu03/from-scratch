@@ -78,7 +78,9 @@ class Learner:
             
             log_ratio = ref_logprobs - action_logprobs
             kl_loss = torch.expm1(log_ratio) - log_ratio
-            self.cumulated_kl_loss += kl_loss.mean()
+            self.cumulated_kl_loss += (
+                kl_loss.detach().mean().item() / total_rollouts
+            )
 
             loss = (-float(advantages[i]) * action_logprobs.mean() + self.kl_loss_weight * kl_loss.mean()) / total_rollouts
             loss.backward()
