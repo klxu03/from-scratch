@@ -66,8 +66,8 @@ class Actor:
 				past_key_values=cache,
 				return_dict_in_generate=True,
 				max_new_tokens=self.max_output_tokens - input_ids.shape[1],
-				do_sample=True, temperature=1.0, top_k=20,
-				top_p=0.95, repetition_penalty=1.1,
+				do_sample=True, temperature=1.0, top_k=0,
+				top_p=1.0, repetition_penalty=1.0,
 			)
 
         sequences = outputs.sequences
@@ -108,12 +108,11 @@ class Actor:
                 curr_exec = ExecutionResult(turn=None, cache=None, next_prompt="", tool_results=[])
                 found_sol = False
                 while not found_sol and input_ids.shape[1] < self.max_output_tokens:
-                    print(f"\nNew turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens")
+                    print(f"\nNew turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens\n")
                     try:
                         curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
                     except Exception as e:
                         print(f"Error executing turn {curr_exec.next_prompt}: {e}")
-                        turns = []
                         break
                     turns.append(curr_exec.turn)
                     input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to(input_ids.device)], dim=1)

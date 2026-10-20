@@ -46,4 +46,4 @@ class LoRALinear(nn.Module):
         if not self.enabled:
             return original
         
-        return original + self.scale * self.B(self.A(x.float())).to(original.dtype)
+        return original + (self.scale * self.B(self.A(x.float()))).to(original.dtype)

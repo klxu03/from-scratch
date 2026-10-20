@@ -43,10 +43,11 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> float:
             puzzles.append(list(map(int, line.split())))
 
     with torch.inference_mode():
+        NUM_PUZZLES = 25
         for puzzle in tqdm(puzzles, desc="Evaluating"):
-            results = actor.collect_rollouts([puzzle], 4)[0]
+            results = actor.collect_rollouts([puzzle], NUM_PUZZLES)[0]
             summed_reward = sum(r.reward for r in results)
-            print(f"Cumulative reward: {summed_reward} / 25 puzzles")
+            print(f"Cumulative reward: {summed_reward} / {NUM_PUZZLES} puzzles")
             return summed_reward
 
 def train(starting_index: int = 0, checkpoint_path: Path | None = None):
@@ -63,8 +64,7 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
         if line.strip():
             train_data.append(list(map(int, line.split()))) 
 
-    train_data = train_data[:16] + train_data[-16:]
-    train_data = [[6, 6, 6, 6]] * 120 
+    train_data = [[6, 6, 6, 6]] * 150 
     cumulated_rewards = []
     cumulated_reward_path = Path(__file__).resolve().parent / "checkpoints" / "cumulated_reward.jpg"
 
@@ -82,14 +82,14 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
         cumulated_rewards.append(cumulated_reward)
         print(f"Cumulated reward: {cumulated_reward}")
 
-        create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward/8", "step", "cumulated reward")
+        create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
         torch.mps.empty_cache()
         log_memory((start // BATCH_SIZE) + 1, "after_empty_cache")
 
         if start % 1 == 0:
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{start}.pt")
 
-    create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward/8", "step", "cumulated reward")
+    create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
     log_memory(len(train_data), "finished")
     learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / "final.pt")
 
@@ -147,6 +147,7 @@ if __name__ == "__main__":
     T 96   |     12      |      17     |
     """
     
+    """
     sanity_path = Path(__file__).resolve().parent / "data/sanity.jsonl"
     # print("Evaluating base model")
     # base_reward = eval(None, sanity_path)
@@ -155,6 +156,7 @@ if __name__ == "__main__":
     final_reward = eval(checkpoint_path, sanity_path)
     base_reward = 1
     print(f"Base reward: {base_reward}, Final reward: {final_reward}")
+    """
 
     # train(starting_index=98, checkpoint_path=Path(__file__).resolve().parent / "checkpoints/checkpoint_96.pt")
-    # train()
+    train()

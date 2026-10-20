@@ -18,6 +18,7 @@ class Learner:
     def zero_grad(self) -> None:
         self.model.zero_grad()
         self.cumulated_rewards = 0
+        self.cumulated_kl_loss = 0
 
     def compute_advantages(self, rollout_group: list[Rollout]) -> np.ndarray:
         rewards = np.asarray([rollout.reward for rollout in rollout_group])
@@ -30,7 +31,7 @@ class Learner:
 
     def compute_action_logprobs(self, token_ids: torch.Tensor, action_mask: torch.Tensor) -> torch.Tensor:
         print(f"Computing action logprobs, token_ids shape: {token_ids.shape}, action_mask shape: {action_mask.shape}")
-        logits = self.model(input_ids = token_ids).logits[0]
+        logits = self.model(input_ids = token_ids, use_cache=False).logits[0]
         print(f"Logits shape: {logits.shape}")
         logprobs = torch.nn.functional.log_softmax(logits.float(), dim=-1)
         print(f"Logprobs shape: {logprobs.shape}")
@@ -69,20 +70,23 @@ class Learner:
                     for turn in rollout.turns
                 ],
             ]).to("mps")
-            action_logprobs = self.compute_action_logprobs(token_ids, action_mask)
 
             with torch.no_grad(), self.model.disable_lora():
                 ref_logprobs = self.compute_action_logprobs(token_ids, action_mask)
+
+            action_logprobs = self.compute_action_logprobs(token_ids, action_mask)
             
             log_ratio = ref_logprobs - action_logprobs
             kl_loss = torch.expm1(log_ratio) - log_ratio
+            self.cumulated_kl_loss += kl_loss.mean()
 
             loss = (-float(advantages[i]) * action_logprobs.mean() + self.kl_loss_weight * kl_loss.mean()) / total_rollouts
             loss.backward()
 
     def step(self) -> float:
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0, error_if_nonfinite=True)
         self.optimizer.step()
+        print(f"Cumulated KL loss: {self.cumulated_kl_loss}")
         return self.cumulated_rewards
 
     def create_checkpoint(self, path: Path):

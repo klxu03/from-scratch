@@ -43,6 +43,12 @@ def verify_solution(expression: str, puzzle: list[int]) -> bool:
     expression, result = expression.split(" = ")
     tree = ast.parse(expression, mode="eval")
 
+    if any(
+        isinstance(node, ast.Constant) and type(node.value) is not int
+        for node in ast.walk(tree)
+    ):
+        return False
+
     numbers_used = [
         node.value
         for node in ast.walk(tree)
