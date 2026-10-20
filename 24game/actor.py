@@ -89,46 +89,82 @@ class Actor:
             tool_results=tool_results,
         )
 
+    def execute_first_turn(self, prompt_ids: torch.Tensor, puzzle: list[int], group_size: int) -> list[ExecutionResult]:
+        with torch.inference_mode():
+            sequences = self.model.generate(
+                input_ids=prompt_ids,
+                attention_mask=torch.ones_like(prompt_ids),
+                num_return_sequences=group_size,
+                num_beams=1,
+                do_sample=True,
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                repetition_penalty=1.0,
+                max_new_tokens=self.max_output_tokens - prompt_ids.shape[1],
+                use_cache=True,
+                return_dict_in_generate=False,
+                output_scores=False,
+                output_logits=False,
+            )
+
+        eos = self.model.generation_config.eos_token_id
+        ret = []
+
+        for row in sequences.cpu():
+            response = row[prompt_ids.shape[1]:]
+            stops = (response == eos).nonzero().flatten()
+            response = response[:stops[0] + 1] if stops.numel() else response
+
+            text = self.tokenizer.decode(response, skip_special_tokens=True)
+            tool_results = execute_tools(text, puzzle)
+
+            ret.append(ExecutionResult(
+                turn=Turn(response.unsqueeze(0), completion_start=0),
+                cache=None,
+                next_prompt=self.continuation_suffix(row[:prompt_ids.shape[1] + len(response)].unsqueeze(0), tool_results),
+                tool_results=tool_results,
+            ))
+        return ret
+
     def collect_rollouts(self, puzzles: list[list[int]], group_size: int = 8) -> list[list[Rollout]]:
         ret: list[list[Rollout]] = []
         for puzzle in puzzles:
-            ret.append([])
-            prompt_text = prompt(self.max_output_tokens, puzzle)
-            for _ in tqdm(range(group_size), desc=f"Collecting {group_size} rollouts for puzzle {puzzle}"):
-                turns: list[Turn] = []
-                input_ids = self.tokenizer.apply_chat_template(
-                    [{"role": "user", "content": prompt_text}],
-                    tools=[calculator],
-                    tokenize=True,
-                    add_generation_prompt=True,
-                    enable_thinking=True,
-                    return_dict=True,
-                    return_tensors="pt",
-                ).to("mps")["input_ids"]
-                curr_exec = ExecutionResult(turn=None, cache=None, next_prompt="", tool_results=[])
-                found_sol = False
-                suffix_len = 0
-                while not found_sol and input_ids.shape[1] + suffix_len < self.max_output_tokens:
-                    print(f"\nNew turn, so far generated {input_ids.shape[1]}/{self.max_output_tokens} tokens\n")
-                    try:
-                        curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
-                    except Exception as e:
-                        print(f"Error executing turn {curr_exec.next_prompt}: {e}")
-                        break
-                    turns.append(curr_exec.turn)
-                    input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to(input_ids.device)], dim=1)
-                    for tool_result in curr_exec.tool_results:
-                        found_sol = found_sol or verify_solution(tool_result, puzzle)
-                    suffix_len = len(self.tokenizer.encode(curr_exec.next_prompt, add_special_tokens=False))
-                print(f"Found solution: {found_sol}")
-                ret[-1].append(Rollout(turns=turns, reward=found_sol))
-        return ret
+            prompt_ids = self.tokenizer.apply_chat_template(
+                [{"role": "user", "content": prompt(self.max_output_tokens, puzzle)}],
+                tools=[calculator],
+                tokenize=True,
+                add_generation_prompt=True,
+                enable_thinking=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to("mps")["input_ids"]
 
+            first_turns = self.execute_first_turn(prompt_ids, puzzle, group_size)
+
+            group = []
+            for curr_exec in tqdm(first_turns, desc=f"Finishing rollouts for {puzzle}"):
+                turns = [curr_exec.turn]
+                input_ids = torch.cat([prompt_ids, curr_exec.turn.token_ids.to("mps")], dim=1)
+
+                found_sol = any(verify_solution(result, puzzle) for result in curr_exec.tool_results)
+                while not found_sol:
+                    suffix_len = len(self.tokenizer.encode(curr_exec.next_prompt, add_special_tokens=False))
+                    if input_ids.shape[1] + suffix_len >= self.max_output_tokens:
+                        break
+
+                    curr_exec = self.execute_turn(curr_exec.cache, input_ids, curr_exec.next_prompt, puzzle)
+                    turns.append(curr_exec.turn)
+                    input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to("mps")], dim=1)
+                    found_sol = any(verify_solution(result, puzzle) for result in curr_exec.tool_results)
+                group.append(Rollout(turns=turns, reward=found_sol))
+            ret.append(group)
+        return ret
 if __name__ == "__main__":
     model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to("mps").eval()
     actor = Actor(model)
-    puzzles = [[6, 6, 6, 6], [8, 1, 2, 9], [3, 5, 3, 7], [8, 3, 3, 8]]
-    group_size = 10
+    puzzles = [[8, 3, 8, 3]]
+    group_size = 8
     rollouts = actor.collect_rollouts(puzzles, group_size=group_size)
     for puzzle, group in zip(puzzles, rollouts):
         successes = sum(rollout.reward for rollout in group)
