@@ -120,6 +120,7 @@ class Actor:
             response = response[:stops[0] + 1] if stops.numel() else response
 
             text = self.tokenizer.decode(response, skip_special_tokens=True)
+            print(f"Generated text: {text}")
             tool_results = execute_tools(text, puzzle)
 
             ret.append(ExecutionResult(
@@ -164,6 +165,7 @@ class Actor:
                 print(f"Found solution: {found_sol}\n")
             ret.append(group)
         return ret
+
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device).eval()

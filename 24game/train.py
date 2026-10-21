@@ -29,8 +29,8 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-actor = Actor(model, MAX_OUTPUT_TOKENS)
-# actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
+# actor = Actor(model, MAX_OUTPUT_TOKENS)
+actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
@@ -213,19 +213,18 @@ if __name__ == "__main__":
     Baseline Validation Results: 17/137
     Overfit on [6, 6, 6, 6]: 30/137
     A6000 Train on 35 steps of 12 batch size: 28/137
-    A100 Train Chckpoint 32: 
+    A100 Train Chckpoint 32: 31/123 
+    A100 Train Checkpoint 72: 56/137
     """
 
-    """
     # sanity_path = Path(__file__).resolve().parent / "data/sanity.jsonl"
     val_path = Path(__file__).resolve().parent / "data/val.jsonl"
     # print("Evaluating base model")
     # base_success_count, base_reward = eval(None, sanity_path)
-    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_32.pt"
+    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_72.pt"
     print("Evaluating final checkpoint")
     final_success_count, final_reward = eval(checkpoint_path, val_path)
     # print(f"Base model: success count {base_success_count}, reward {base_reward}")
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
-    """
 
-    train()
+    # train()
