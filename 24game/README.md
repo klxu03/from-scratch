@@ -31,7 +31,7 @@ This writes `24game/data/easy.jsonl`, `24game/data/medium.jsonl`, and `24game/da
 On CUDA:
 ```bash
 uv run --locked --extra cuda python 24game/train.py
-nohup uv run --locked --extra cuda python 24game/train.py > run.run 2>&1 & # run on box
+nohup uv run --locked --extra cuda python -u 24game/train.py > run.run 2>&1 & # run on box
 ```
 
 On Mac:

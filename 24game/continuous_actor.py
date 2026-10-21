@@ -327,7 +327,7 @@ class Actor(OriginalActor):
                 if self.log_chunks:
                     mode = "prefill" if fresh else "cached"
                     print(
-                        f"[{mode}] mini_batch={batch_size}, limit={max_new_tokens}, "
+                        f"[{mode}] decode_batch={batch_size}, limit={max_new_tokens}, "
                         f"tokens={real_tokens}, {elapsed:.2f}s | "
                         f"active={len(active)}, waiting={len(waiting)}, "
                         f"done={completed}/{total}"

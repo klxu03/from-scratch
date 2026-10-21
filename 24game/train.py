@@ -68,7 +68,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
 def train(checkpoint_path: Path | None = None):
     BATCH_SIZE = 12
     GROUP_SIZE = 12
-    EPOCHS = 2
+    EPOCHS = 4
 
     if checkpoint_path is not None:
         print(f"Loading checkpoint from {checkpoint_path}")
@@ -104,11 +104,11 @@ def train(checkpoint_path: Path | None = None):
             for i, rollout_group in enumerate(rollouts):
                 learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * len(training_batch))
             avg_reward = learner.step() / (GROUP_SIZE * len(training_batch))
-            step_time = time.time()
             log_memory((start // BATCH_SIZE) + 1, device=model.device)
+            step_time = time.time()
             avg_rewards.append(avg_reward)
             print(f"Average reward: {avg_reward}")
-            print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}")
+            print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}\n")
 
             create_graph(avg_reward_path, avg_rewards, "GRPO average reward", "step", "average reward")
             empty_device_cache(model.device)
