@@ -66,9 +66,9 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None):
-    BATCH_SIZE = 12
+    BATCH_SIZE = 28
     GROUP_SIZE = 12
-    EPOCHS = 4
+    EPOCHS = 8
 
     if checkpoint_path is not None:
         print(f"Loading checkpoint from {checkpoint_path}")
@@ -99,6 +99,11 @@ def train(checkpoint_path: Path | None = None):
             learner.zero_grad()
 
             start_time = time.time()
+
+            if model.device.type == "cuda":
+                torch.cuda.reset_peak_memory_stats(model.device)
+                retries_before = torch.cuda.memory_stats(model.device)["num_alloc_retries"]
+
             rollouts = actor.collect_rollouts(training_batch, GROUP_SIZE)
             rollout_time = time.time()
             for i, rollout_group in enumerate(rollouts):
@@ -107,6 +112,21 @@ def train(checkpoint_path: Path | None = None):
             log_memory((start // BATCH_SIZE) + 1, device=model.device)
             step_time = time.time()
             avg_rewards.append(avg_reward)
+
+            if model.device.type == "cuda":
+                torch.cuda.synchronize(model.device)
+                memory_stats = torch.cuda.memory_stats(model.device)
+
+                print(
+                    f"Peak live: "
+                    f"{torch.cuda.max_memory_allocated(model.device) / 2**30:.2f} GiB | "
+                    f"Peak reserved: "
+                    f"{torch.cuda.max_memory_reserved(model.device) / 2**30:.2f} GiB | "
+                    f"Allocation retries this step: "
+                    f"{memory_stats['num_alloc_retries'] - retries_before}",
+                    flush=True,
+                )
+
             print(f"Average reward: {avg_reward}")
             print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}\n")
 
