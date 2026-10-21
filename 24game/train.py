@@ -3,7 +3,7 @@ from transformers import Qwen3_5ForCausalLM
 import matplotlib
 import torch
 from tqdm import tqdm
-from actor import Actor
+from continuous_actor import Actor
 from learner import Learner
 from lora_linear import apply_lora
 
