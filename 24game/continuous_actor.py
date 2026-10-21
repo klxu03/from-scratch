@@ -48,7 +48,7 @@ class Actor(OriginalActor):
         *,
         chunk_size: int = CHUNK_SIZE,
         rebuild_threshold: float = REBUILD_THRESHOLD,
-        log_chunks: bool = False,
+        log_chunks: bool = True,
     ):
         super().__init__(model, max_output_tokens)
         if max_output_tokens <= 0 or chunk_size <= 0:
@@ -327,7 +327,7 @@ class Actor(OriginalActor):
                 if self.log_chunks:
                     mode = "prefill" if fresh else "cached"
                     print(
-                        f"[{mode}] batch={batch_size}, limit={max_new_tokens}, "
+                        f"[{mode}] mini_batch={batch_size}, limit={max_new_tokens}, "
                         f"tokens={real_tokens}, {elapsed:.2f}s | "
                         f"active={len(active)}, waiting={len(waiting)}, "
                         f"done={completed}/{total}"

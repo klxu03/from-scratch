@@ -65,8 +65,8 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(starting_index: int = 0, checkpoint_path: Path | None = None):
-    BATCH_SIZE = 4
-    GROUP_SIZE = 8
+    BATCH_SIZE = 12
+    GROUP_SIZE = 12
     EPOCHS = 2
 
     if checkpoint_path is not None:
@@ -108,7 +108,7 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
             empty_device_cache(model.device)
             log_memory((start // BATCH_SIZE) + 1, "after_empty_cache", model.device)
 
-            if start % 25 == 0:
+            if start % 5 == 0:
                 learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{epoch * len(train_data) + start}.pt")
 
     create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
