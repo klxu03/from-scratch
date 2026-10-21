@@ -9,7 +9,7 @@ from pathlib import Path
 from math import ceil
 import random
 
-SEED = 42
+SEED = 800
 rng = random.Random(SEED)
 
 class Term(NamedTuple):
