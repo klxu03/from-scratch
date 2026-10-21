@@ -6,7 +6,6 @@ import sympy
 import re
 from tqdm import tqdm
 from pathlib import Path
-import numpy as np
 from math import ceil
 import random
 
@@ -113,7 +112,7 @@ def split_dataset():
             for line in path.read_text().splitlines()
             if line.strip()
         ]
-        np.random.shuffle(puzzles)
+        rng.shuffle(puzzles)
         val_count = ceil(len(puzzles) * val_percentage)
         test_count = ceil(len(puzzles) * test_percentage)
         val_puzzles = puzzles[:val_count]

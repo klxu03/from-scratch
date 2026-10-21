@@ -22,6 +22,8 @@ DEVICE = (
     else torch.device("mps") if torch.backends.mps.is_available()
     else torch.device("cpu")
 )
+if DEVICE.type == "cuda":
+    torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
 actor = Actor(model, MAX_OUTPUT_TOKENS)

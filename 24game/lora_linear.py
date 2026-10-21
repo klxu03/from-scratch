@@ -28,6 +28,8 @@ def disable_lora(model: nn.Module):
         for layer, enabled in zip(layers, previous):
             layer.enabled = enabled
 
+from contextlib import nullcontext
+
 class LoRALinear(nn.Module):
     def __init__(self, linear: nn.Linear, r: int = 8, alpha: float = 4):
         super().__init__()
@@ -46,4 +48,13 @@ class LoRALinear(nn.Module):
         if not self.enabled:
             return original
         
+        context = (
+            torch.autocast("cuda", dtype=torch.bfloat16)
+            if x.is_cuda
+            else nullcontext()
+        )
+
+        with context:
+            update = self.B(self.A(x.float()))
+
         return original + (self.scale * self.B(self.A(x.float()))).to(original.dtype)

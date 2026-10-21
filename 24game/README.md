@@ -35,7 +35,7 @@ uv run --locked --extra cuda python 24game/train.py
 
 On Mac:
 ```bash
-uv run python 24game/dataset.py
+uv run python 24game/train.py
 ```
 
 The first run downloads `Qwen/Qwen3.5-0.8B`. Training uses CUDA when it is available, otherwise MPS, otherwise CPU. Checkpoints and the reward plot are written to `24game/checkpoints/`.
