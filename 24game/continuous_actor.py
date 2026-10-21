@@ -217,8 +217,6 @@ class Actor(OriginalActor):
                         eos_token_id=self.tokenizer.eos_token_id,
                         pad_token_id=self.pad_id,
                         forced_eos_token_id=None,
-                        min_length=0,
-                        min_new_tokens=0,
                         max_new_tokens=max_new_tokens,
                         num_return_sequences=1,  # Histories are already expanded.
                         num_beams=1,
@@ -298,7 +296,7 @@ class Actor(OriginalActor):
                 del output
                 if self.log_chunks:
                     mode = "prefill" if fresh else "cached"
-                    tqdm.write(
+                    print(
                         f"[{mode}] batch={batch_size}, limit={max_new_tokens}, "
                         f"tokens={real_tokens}, {elapsed:.2f}s | "
                         f"active={len(active)}, waiting={len(waiting)}, "

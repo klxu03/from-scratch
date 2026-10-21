@@ -85,8 +85,14 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
 
     log_memory(0, "initialized", model.device)
 
-    for epoch in tqdm(range(EPOCHS), desc="Epochs of GRPO Training"):
-        for start in tqdm(range(starting_index, len(train_data), BATCH_SIZE), desc=f"Running epoch {epoch} of GRPO Training"):
+    for epoch in range(EPOCHS):
+        for start in tqdm(
+            range(starting_index, len(train_data), BATCH_SIZE),
+            desc=f"Epoch {epoch + 1}/{EPOCHS} | Training batches",
+            position=0,
+            leave=True,
+            dynamic_ncols=True,
+        ):
             training_batch = train_data[start:start + BATCH_SIZE]
             learner.zero_grad()
 
