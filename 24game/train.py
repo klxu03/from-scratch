@@ -6,6 +6,7 @@ from tqdm import tqdm
 from continuous_actor import Actor
 from learner import Learner
 from lora_linear import apply_lora
+import time
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-actor = Actor(model, MAX_OUTPUT_TOKENS, rebuild_threshold=0.1)
+actor = Actor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
@@ -64,7 +65,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
     return success_count, cumulative_reward
 
-def train(starting_index: int = 0, checkpoint_path: Path | None = None):
+def train(checkpoint_path: Path | None = None):
     BATCH_SIZE = 12
     GROUP_SIZE = 12
     EPOCHS = 2
@@ -80,14 +81,15 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
             train_data.append(list(map(int, line.split()))) 
 
     # train_data = [[6, 6, 6, 6]] * 150 
-    cumulated_rewards = []
-    cumulated_reward_path = Path(__file__).resolve().parent / "checkpoints" / "cumulated_reward.jpg"
+    avg_rewards = []
+    avg_reward_path = Path(__file__).resolve().parent / "checkpoints" / "average_reward.jpg"
 
     log_memory(0, "initialized", model.device)
 
+    update_step = 0
     for epoch in range(EPOCHS):
         for start in tqdm(
-            range(starting_index, len(train_data), BATCH_SIZE),
+            range(0, len(train_data), BATCH_SIZE),
             desc=f"Epoch {epoch + 1}/{EPOCHS} | Training batches",
             position=0,
             leave=True,
@@ -96,22 +98,25 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
             training_batch = train_data[start:start + BATCH_SIZE]
             learner.zero_grad()
 
+            start_time = time.time()
             rollouts = actor.collect_rollouts(training_batch, GROUP_SIZE)
+            rollout_time = time.time()
             for i, rollout_group in enumerate(rollouts):
                 learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * len(training_batch))
-            cumulated_reward = learner.step()
+            avg_reward = learner.step() / (GROUP_SIZE * len(training_batch))
+            step_time = time.time()
             log_memory((start // BATCH_SIZE) + 1, device=model.device)
-            cumulated_rewards.append(cumulated_reward)
-            print(f"Cumulated reward: {cumulated_reward}")
+            avg_rewards.append(avg_reward)
+            print(f"Average reward: {avg_reward}")
+            print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}")
 
-            create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
+            create_graph(avg_reward_path, avg_rewards, "GRPO average reward", "step", "average reward")
             empty_device_cache(model.device)
             log_memory((start // BATCH_SIZE) + 1, "after_empty_cache", model.device)
 
-            if start % 5 == 0:
-                learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{epoch * len(train_data) + start}.pt")
+            learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
-    create_graph(cumulated_reward_path, cumulated_rewards, "GRPO cumulated reward", "step", "cumulated reward")
+    create_graph(avg_reward_path, avg_rewards, "GRPO average reward", "step", "average reward")
     log_memory(len(train_data), "finished", model.device)
     learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / "final.pt")
 

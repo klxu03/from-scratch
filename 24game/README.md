@@ -31,11 +31,12 @@ This writes `24game/data/easy.jsonl`, `24game/data/medium.jsonl`, and `24game/da
 On CUDA:
 ```bash
 uv run --locked --extra cuda python 24game/train.py
+nohup uv run --locked --extra cuda python 24game/train.py > run.run 2>&1 & # run on box
 ```
 
 On Mac:
 ```bash
-uv run python 24game/train.py
+uv run python 24game/train.py > run.run 2>&1
 ```
 
 The first run downloads `Qwen/Qwen3.5-0.8B`. Training uses CUDA when it is available, otherwise MPS, otherwise CPU. Checkpoints and the reward plot are written to `24game/checkpoints/`.
