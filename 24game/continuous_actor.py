@@ -129,7 +129,15 @@ class Actor(OriginalActor):
             state.turn_ids[state.completion_start:], skip_special_tokens=True
         )
         tool_results = execute_tools(text, state.puzzle)
-        solved = any(verify_solution(result, state.puzzle) for result in tool_results)
+        solved = False
+        for result in tool_results:
+            try:
+                if verify_solution(result, state.puzzle):
+                    solved = True
+                    break
+            except (ValueError, SyntaxError, TypeError) as e:
+                print(f"Skipping malformed tool result {result!r}: {e}", flush=True)
+
         state.reward = float(solved)
 
         # Match the original actor: a complete tool call at the final token limit

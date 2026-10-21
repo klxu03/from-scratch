@@ -20,6 +20,9 @@ def calculator(expression: str) -> str:
     if len(expression) > 128:
         raise ValueError("Expression too long")
 
+    if "#" in expression or "=" in expression:
+        raise ValueError("Comments and equality signs are not allowed")
+
     tree = ast.parse(expression, mode="eval")
 
     def evaluate(node):
@@ -40,7 +43,11 @@ def calculator(expression: str) -> str:
     return str(evaluate(tree.body))
 
 def verify_solution(expression: str, puzzle: list[int]) -> bool:
-    expression, result = expression.split(" = ")
+    parts = expression.split(" = ")
+    if len(parts) != 2:
+        return False
+    expression, result = parts
+
     tree = ast.parse(expression, mode="eval")
 
     if any(
