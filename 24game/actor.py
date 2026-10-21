@@ -75,6 +75,7 @@ class Actor:
         sequences = outputs.sequences
         raw_response = sequences[0, input_ids.shape[1]:]
         text = self.tokenizer.decode(raw_response, skip_special_tokens=True)
+        print(f"Generated text: {text}")
         tool_results = execute_tools(text, puzzle)
         print(f"Tool results: {tool_results}")
 

@@ -4,9 +4,11 @@ import matplotlib
 import torch
 from tqdm import tqdm
 from continuous_actor import Actor
+from actor import Actor as OriginalActor
 from learner import Learner
 from lora_linear import apply_lora
 import time
+import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -28,6 +30,7 @@ if DEVICE.type == "cuda":
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
 actor = Actor(model, MAX_OUTPUT_TOKENS)
+# actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
@@ -44,6 +47,7 @@ def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabe
 def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     if checkpoint_path is not None:
         learner.load_checkpoint(checkpoint_path)
+        print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
     model.eval()
 
     puzzles = []
@@ -55,18 +59,18 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     cumulative_reward = 0
     with torch.inference_mode():
         NUM_PUZZLES = 1
-        for puzzle in tqdm(puzzles, desc="Evaluating"):
+        for ran, puzzle in enumerate(tqdm(puzzles, desc="Evaluating"), start=1):
             results = actor.collect_rollouts([puzzle], NUM_PUZZLES)[0]
             summed_reward = sum(r.reward for r in results)
-            print(f"Cumulative reward: {summed_reward} / {NUM_PUZZLES} puzzles for puzzle {puzzle}\n")
             cumulative_reward += summed_reward
             if summed_reward > 0:
                 success_count += 1
+            print(f"Successes so far: {success_count}/{ran}\n")
     print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None):
-    BATCH_SIZE = 28
+    BATCH_SIZE = 20
     GROUP_SIZE = 12
     EPOCHS = 8
 
@@ -82,12 +86,13 @@ def train(checkpoint_path: Path | None = None):
 
     # train_data = [[6, 6, 6, 6]] * 150 
     avg_rewards = []
-    avg_reward_path = Path(__file__).resolve().parent / "checkpoints" / "average_reward.jpg"
+    avg_reward_path = Path(__file__).resolve().parent / "average_reward.jpg"
 
     log_memory(0, "initialized", model.device)
 
     update_step = 0
     for epoch in range(EPOCHS):
+        np.random.shuffle(train_data)
         for start in tqdm(
             range(0, len(train_data), BATCH_SIZE),
             desc=f"Epoch {epoch + 1}/{EPOCHS} | Training batches",
@@ -207,17 +212,19 @@ if __name__ == "__main__":
     """
     Baseline Validation Results: 17/137
     Overfit on [6, 6, 6, 6]: 30/137
+    A6000 Train on 35 steps of 12 batch size: 28/137
+    A100 Train Chckpoint 32: 
     """
 
     """
     # sanity_path = Path(__file__).resolve().parent / "data/sanity.jsonl"
-    sanity_path = Path(__file__).resolve().parent / "data/val.jsonl"
-    print("Evaluating base model")
-    base_success_count, base_reward = eval(None, sanity_path)
-    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/final.pt"
+    val_path = Path(__file__).resolve().parent / "data/val.jsonl"
+    # print("Evaluating base model")
+    # base_success_count, base_reward = eval(None, sanity_path)
+    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_32.pt"
     print("Evaluating final checkpoint")
-    final_success_count, final_reward = eval(checkpoint_path, sanity_path)
-    print(f"Base model: success count {base_success_count}, reward {base_reward}")
+    final_success_count, final_reward = eval(checkpoint_path, val_path)
+    # print(f"Base model: success count {base_success_count}, reward {base_reward}")
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
     """
 
