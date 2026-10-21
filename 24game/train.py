@@ -26,7 +26,7 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-actor = Actor(model, MAX_OUTPUT_TOKENS)
+actor = Actor(model, MAX_OUTPUT_TOKENS, rebuild_threshold=0.1)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
@@ -65,7 +65,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(starting_index: int = 0, checkpoint_path: Path | None = None):
-    BATCH_SIZE = 1
+    BATCH_SIZE = 4
     GROUP_SIZE = 8
     EPOCHS = 2
 
@@ -98,7 +98,7 @@ def train(starting_index: int = 0, checkpoint_path: Path | None = None):
 
             rollouts = actor.collect_rollouts(training_batch, GROUP_SIZE)
             for i, rollout_group in enumerate(rollouts):
-                learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * BATCH_SIZE)
+                learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * len(training_batch))
             cumulated_reward = learner.step()
             log_memory((start // BATCH_SIZE) + 1, device=model.device)
             cumulated_rewards.append(cumulated_reward)

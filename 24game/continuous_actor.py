@@ -1,4 +1,9 @@
-"""Chunked rollout collection with a shrinking cache-preserving active batch.
+"""Multi-puzzle rollout collection with a shrinking cache-preserving batch.
+
+collect_rollouts(four_puzzles, group_size=8) initially schedules 32 rows in ONE
+GPU batch. Returned results remain grouped as results[puzzle_index][sample_index].
+Only generation is batched here; the learner can still backpropagate one rollout
+at a time and make one optimizer update after all puzzle groups are accumulated.
 
 Place beside actor.py. In train.py, change `from actor import Actor` to
 `from continuous_actor import Actor`. Keep actor.py: this module reuses its
@@ -13,7 +18,6 @@ import time
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
-from tqdm import tqdm
 from transformers import DynamicCache
 
 from actor import Actor as OriginalActor, Rollout, Turn
@@ -44,7 +48,7 @@ class Actor(OriginalActor):
         *,
         chunk_size: int = CHUNK_SIZE,
         rebuild_threshold: float = REBUILD_THRESHOLD,
-        log_chunks: bool = True,
+        log_chunks: bool = False,
     ):
         super().__init__(model, max_output_tokens)
         if max_output_tokens <= 0 or chunk_size <= 0:
@@ -110,6 +114,8 @@ class Actor(OriginalActor):
         count = response.numel()
         state.history = torch.cat([state.history, response])
         state.turn_ids = torch.cat([state.turn_ids, response])
+        if state.history.numel() > self.max_output_tokens:
+            raise RuntimeError("A rollout exceeded its real-token budget")
         exhausted = state.history.numel() >= self.max_output_tokens
         if not reached_eos and not exhausted:
             return "active", count
@@ -154,11 +160,23 @@ class Actor(OriginalActor):
     def collect_rollouts(
         self, puzzles: list[list[int]], group_size: int = 8
     ) -> list[list[Rollout]]:
+        """Collect len(puzzles) * group_size samples with fixed policy weights.
+
+        Puzzles share one active/waiting scheduler, NOT one scheduler per puzzle.
+        Group membership is retained even when rows finish out of order. Caches
+        are local to this call and are never retained across optimizer updates.
+        """
         if group_size <= 0:
             raise ValueError("group_size must be positive")
         self.last_stats = dict(
-            chunks=0, prefills=0, cached_chunks=0, generated_tokens=0,
+            num_puzzles=len(puzzles), group_size=group_size,
+            num_rollouts=len(puzzles) * group_size,
+            initial_batch_size=len(puzzles) * group_size,
+            max_active_batch_size=0, completed_rollouts=0,
+            chunks=0, prefills=0, rebuilds=0, cached_chunks=0,
+            generated_tokens=0, prefill_real_tokens=0, prefill_padded_tokens=0,
             generate_seconds=0.0, wall_seconds=0.0,
+            seconds_per_puzzle=0.0, rollouts_per_second=0.0,
         )
         if not puzzles:
             return []
@@ -189,7 +207,13 @@ class Actor(OriginalActor):
                     cohort_start_size = len(active)
                     input_ids, attention_mask = self._fresh_batch(active)
                     cache = DynamicCache(config=self.model.config)
+                    self.last_stats["rebuilds"] += int(self.last_stats["prefills"] > 0)
                     self.last_stats["prefills"] += 1
+                    self.last_stats["prefill_real_tokens"] += sum(
+                        state.history.numel() for state in active
+                    )
+                    # Includes padding; compare with real tokens to measure waste.
+                    self.last_stats["prefill_padded_tokens"] += input_ids.numel()
                 else:
                     self.last_stats["cached_chunks"] += 1
 
@@ -201,6 +225,9 @@ class Actor(OriginalActor):
                     raise RuntimeError("An exhausted rollout was left in the active batch")
 
                 batch_size = len(active)
+                self.last_stats["max_active_batch_size"] = max(
+                    self.last_stats["max_active_batch_size"], batch_size
+                )
                 prefix_width = input_ids.shape[1]
                 self._synchronize()
                 tick = time.perf_counter()
@@ -237,6 +264,8 @@ class Actor(OriginalActor):
                 self.last_stats["chunks"] += 1
                 self.last_stats["generate_seconds"] += elapsed
 
+                if output.sequences.shape[0] != batch_size:
+                    raise RuntimeError("generate() changed the number of active rows")
                 generated = output.sequences[:, prefix_width:].detach().cpu()
                 generated_width = generated.shape[1]
                 if not 0 < generated_width <= max_new_tokens:
@@ -261,6 +290,7 @@ class Actor(OriginalActor):
                         )
                         completed += 1
                 self.last_stats["generated_tokens"] += real_tokens
+                self.last_stats["completed_rollouts"] = completed
 
                 # Only rebuild a small active batch if there is waiting work to add.
                 rebuild = bool(waiting) and (
@@ -301,14 +331,18 @@ class Actor(OriginalActor):
                         f"tokens={real_tokens}, {elapsed:.2f}s | "
                         f"active={len(active)}, waiting={len(waiting)}, "
                         f"done={completed}/{total}"
-                        + (" | rebuild next" if rebuild else "")
+                        + (" | rebuild next" if rebuild else ""),
+                        flush=True,
                     )
         finally:
             cache = None
             input_ids = attention_mask = None
             for module, was_training in previous_modes:
                 module.training = was_training
-            self.last_stats["wall_seconds"] = time.perf_counter() - started
+            wall_seconds = time.perf_counter() - started
+            self.last_stats["wall_seconds"] = wall_seconds
+            self.last_stats["seconds_per_puzzle"] = wall_seconds / len(puzzles)
+            self.last_stats["rollouts_per_second"] = completed / max(wall_seconds, 1e-9)
 
         if completed != total or any(r is None for group in results for r in group):
             raise RuntimeError("Scheduler finished without returning every rollout")
@@ -316,7 +350,10 @@ class Actor(OriginalActor):
 
 
 if __name__ == "__main__":
+    # Four prompts x eight samples = 32 simultaneously scheduled rollouts.
+    # Inference smoke test only: no backward pass or optimizer update here.
     from transformers import Qwen3_5ForCausalLM
+    from lora_linear import apply_lora
 
     device = (
         "cuda" if torch.cuda.is_available()
@@ -328,10 +365,14 @@ if __name__ == "__main__":
     dtype = torch.float32 if device == "cpu" else torch.bfloat16
     model = Qwen3_5ForCausalLM.from_pretrained(
         "Qwen/Qwen3.5-0.8B", dtype=dtype
-    ).to(device).eval()
-    actor = Actor(model, max_output_tokens=2048)
-    puzzles = [[6, 6, 6, 6]]
+    ).to(device)
+    model = apply_lora(model).eval()
+    actor = Actor(
+        model, max_output_tokens=2048, chunk_size=512,
+        rebuild_threshold=0.25, log_chunks=True,
+    )
+    puzzles = [[6, 6, 6, 6], [4, 5, 7, 4], [8, 3, 8, 3], [1, 2, 8, 9]]
     groups = actor.collect_rollouts(puzzles, group_size=8)
-    for puzzle, group in zip(puzzles, groups):
+    for puzzle, group in zip(puzzles, groups, strict=True):
         print(f"Puzzle {puzzle}: {sum(r.reward for r in group):g}/{len(group)} successes")
     print(actor.last_stats)
