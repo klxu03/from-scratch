@@ -86,7 +86,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
 
     # train_data = [[6, 6, 6, 6]] * 150 
     avg_rewards = initial_avg_rewards
-    avg_reward_path = Path(__file__).resolve().parent / "average_reward.jpg"
+    avg_reward_path = Path(__file__).resolve().with_name("average_reward.jpg")
 
     log_memory(0, "initialized", model.device)
 
