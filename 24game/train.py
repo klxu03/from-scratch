@@ -29,8 +29,8 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-# actor = Actor(model, MAX_OUTPUT_TOKENS)
-actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
+actor = Actor(model, MAX_OUTPUT_TOKENS)
+# actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
@@ -69,8 +69,8 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
     return success_count, cumulative_reward
 
-def train(checkpoint_path: Path | None = None):
-    BATCH_SIZE = 20
+def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
+    BATCH_SIZE = 16
     GROUP_SIZE = 12
     EPOCHS = 8
 
@@ -85,17 +85,20 @@ def train(checkpoint_path: Path | None = None):
             train_data.append(list(map(int, line.split()))) 
 
     # train_data = [[6, 6, 6, 6]] * 150 
-    avg_rewards = []
+    avg_rewards = initial_avg_rewards
     avg_reward_path = Path(__file__).resolve().parent / "average_reward.jpg"
 
     log_memory(0, "initialized", model.device)
 
-    update_step = 0
-    for epoch in range(EPOCHS):
+    update_step = initial_update_step
+    # for epoch in range(EPOCHS):
+    epoch = 0
+    while True:
+        epoch += 1
         np.random.shuffle(train_data)
         for start in tqdm(
             range(0, len(train_data), BATCH_SIZE),
-            desc=f"Epoch {epoch + 1}/{EPOCHS} | Training batches",
+            desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
@@ -217,6 +220,7 @@ if __name__ == "__main__":
     A100 Train Checkpoint 72: 56/137
     """
 
+    """
     # sanity_path = Path(__file__).resolve().parent / "data/sanity.jsonl"
     val_path = Path(__file__).resolve().parent / "data/val.jsonl"
     # print("Evaluating base model")
@@ -226,5 +230,9 @@ if __name__ == "__main__":
     final_success_count, final_reward = eval(checkpoint_path, val_path)
     # print(f"Base model: success count {base_success_count}, reward {base_reward}")
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
+    """
 
-    # train()
+    starting_checkpoint = 120
+    checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
+    initial_avg_rewards = [0.15833, 0.095833, 0.1833, 0.15, 0.1875, 0.166, 0.075, 0.166, 0.133, 0.19166, 0.20833, 0.15, 0.2125, 0.1375, 0.179166, 0.225, 0.2166, 0.1833, 0.204166, 0.2125, 0.15, 0.1833, 0.245833, 0.2375, 0.24166, 0.2375, 0.3, 0.266, 0.2125, 0.30833, 0.254166, 0.179166, 0.275, 0.279166, 0.354166, 0.245833, 0.2625, 0.25833, 0.3166, 0.320833, 0.279166, 0.2875, 0.354166, 0.304166, 0.24166, 0.304166, 0.15833, 0.15833, 0.145833, 0.120833, 0.129166, 0.15, 0.1875, 0.145833, 0.020833, 0.3375, 0.3833, 0.433, 0.3833, 0.3625, 0.44166, 0.366, 0.375, 0.404166, 0.404166, 0.3875, 0.44166, 0.479166, 0.433, 0.420833, 0.529166, 0.4625, 0.5875, 0.570833, 0.4833, 0.475, 0.420833, 0.433, 0.5, 0.4833, 0.4875, 0.625, 0.475, 0.40833, 0.5, 0.4875, 0.325, 0.5875, 0.604166, 0.5833, 0.429166, 0.4875, 0.620833, 0.533, 0.554166, 0.504166, 0.429166, 0.620833, 0.533, 0.45833, 0.470833, 0.195833, 0.304166, 0.229166, 0.2125, 0.2375, 0.225, 0.2375, 0.229166, 0.03125, 0.466, 0.525, 0.625, 0.566, 0.545833, 0.49166, 0.4166, 0.55833, 0.466, 0.5375]
+    train(checkpoint_path, initial_update_step=starting_checkpoint, initial_avg_rewards=initial_avg_rewards)
