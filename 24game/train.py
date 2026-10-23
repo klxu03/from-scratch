@@ -65,13 +65,13 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
             cumulative_reward += summed_reward
             if summed_reward > 0:
                 success_count += 1
-            print(f"Successes so far: {success_count}/{ran}\n")
+            print(f"Successes so far: {success_count}/{ran}\n\n")
     print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 16
-    GROUP_SIZE = 12
+    BATCH_SIZE = 8
+    GROUP_SIZE = 24
     EPOCHS = 8
 
     if checkpoint_path is not None:
@@ -85,6 +85,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             train_data.append(list(map(int, line.split()))) 
 
     # train_data = [[6, 6, 6, 6]] * 150 
+    harder_puzzles = train_data[-220:]
     avg_rewards = initial_avg_rewards
     avg_reward_path = Path(__file__).resolve().with_name("average_reward.jpg")
 
@@ -95,7 +96,10 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        np.random.shuffle(train_data)
+        epoch_puzzles = harder_puzzles
+        epoch_puzzles.extend(np.random.choice(train_data, size=100, replace=False))
+        # randomly sample 100 puzzles from train_data to add to current set
+        np.random.shuffle(epoch_puzzles)
         for start in tqdm(
             range(0, len(train_data), BATCH_SIZE),
             desc=f"Epoch {epoch} | Training batches",
@@ -120,6 +124,9 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             log_memory((start // BATCH_SIZE) + 1, device=model.device)
             step_time = time.time()
             avg_rewards.append(avg_reward)
+
+            for puzzle, group in zip(training_batch, rollouts):
+                print(f"update_step {update_step + 1} | Puzzle: {sorted(puzzle)} had {sum(r.reward for r in group)} successes and generated {sum(turn.token_ids.shape[-1] - turn.completion_start for rollout in group for turn in rollout.turns)} tokens")
 
             if model.device.type == "cuda":
                 torch.cuda.synchronize(model.device)
@@ -216,8 +223,12 @@ if __name__ == "__main__":
     Baseline Validation Results: 17/137
     Overfit on [6, 6, 6, 6]: 30/137
     A6000 Train on 35 steps of 12 batch size: 28/137
-    A100 Train Chckpoint 32: 31/123 
-    A100 Train Checkpoint 72: 56/137
+    Hero Train Chckpoint 32: 31/123 
+    Hero Train Chckpoint 72: 56/137
+    *** Regenerated validation
+    Hero Train Checkpoint 297: 81/137 
+    Hero Train Checkpoint 363: 80/137 
+    Hero Train Checkpoint 398: /137 
     """
 
     """

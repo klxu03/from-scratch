@@ -20,6 +20,9 @@ class Learner:
         self.cumulated_rewards = 0
         self.cumulated_kl_loss = 0
 
+        self.entropy_sum = 0.0
+        self.entropy_count = 0
+
     def compute_advantages(self, rollout_group: list[Rollout]) -> np.ndarray:
         rewards = np.asarray([rollout.reward for rollout in rollout_group])
         self.cumulated_rewards += sum(rewards)
@@ -29,9 +32,11 @@ class Learner:
             return np.zeros_like(advantages)
         return advantages / std
 
-    def compute_action_logprobs(self, token_ids: torch.Tensor, action_mask: torch.Tensor) -> torch.Tensor:
+    def compute_action_logprobs(self, token_ids: torch.Tensor, action_mask: torch.Tensor, record_entropy: bool = False) -> torch.Tensor:
         print(f"Computing action logprobs, token_ids shape: {token_ids.shape}, action_mask shape: {action_mask.shape}")
         logits = self.model(input_ids = token_ids, use_cache=False).logits[0]
+        if record_entropy:
+            self.record_entropy(logits, action_mask)
         print(f"Logits shape: {logits.shape}")
         logprobs = torch.nn.functional.log_softmax(logits.float(), dim=-1)
         print(f"Logprobs shape: {logprobs.shape}")
@@ -74,7 +79,7 @@ class Learner:
             with torch.no_grad(), self.model.disable_lora():
                 ref_logprobs = self.compute_action_logprobs(token_ids, action_mask)
 
-            action_logprobs = self.compute_action_logprobs(token_ids, action_mask)
+            action_logprobs = self.compute_action_logprobs(token_ids, action_mask, record_entropy=True)
             
             log_ratio = ref_logprobs - action_logprobs
             kl_loss = torch.expm1(log_ratio) - log_ratio
@@ -86,10 +91,38 @@ class Learner:
             loss.backward()
 
     def step(self) -> float:
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0, error_if_nonfinite=True)
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0, error_if_nonfinite=True)
         self.optimizer.step()
+        print(f"Gradient norm (before clipping): {grad_norm.item():.4f}")
+        print(f"Gradient clipped: {grad_norm.item() > 1.0}")
         print(f"Cumulated KL loss: {self.cumulated_kl_loss}")
+
+        print(
+            f"Policy entropy: "
+            f"{self.entropy_sum / max(self.entropy_count, 1):.4f} nats"
+        )
+
         return self.cumulated_rewards
+
+    def record_entropy(self, logits, action_mask):
+        with torch.no_grad():
+            # Action at token position t+1 is predicted by logits[t].
+            positions = action_mask[1:].nonzero(as_tuple=True)[0][::64]
+
+            if positions.numel() == 0:
+                return
+
+            # Only gather selected positions, not the full sequence.
+            selected_logits = logits.detach().index_select(
+                0, positions
+            ).float()
+
+            log_p = torch.log_softmax(selected_logits, dim=-1)
+
+            entropy = -(log_p.exp() * log_p).sum(dim=-1)
+
+            self.entropy_sum += entropy.sum().item()
+            self.entropy_count += entropy.numel()
 
     def create_checkpoint(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -162,7 +162,7 @@ class Actor:
                     input_ids = torch.cat([input_ids, curr_exec.turn.token_ids.to(self.model.device)], dim=1)
                     found_sol = any(verify_solution(result, puzzle) for result in curr_exec.tool_results)
                 group.append(Rollout(turns=turns, reward=found_sol))
-                print(f"Found solution: {found_sol}\n")
+                print(f"Found solution: {found_sol}\n\n")
             ret.append(group)
         return ret
 
