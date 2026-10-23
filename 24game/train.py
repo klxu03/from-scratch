@@ -96,18 +96,18 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        epoch_puzzles = harder_puzzles
+        epoch_puzzles = harder_puzzles + [rand_puzzle for rand_puzzle in np.random.choice(len(train_data), size=100, replace=False)]
         epoch_puzzles.extend(np.random.choice(train_data, size=100, replace=False))
         # randomly sample 100 puzzles from train_data to add to current set
         np.random.shuffle(epoch_puzzles)
         for start in tqdm(
-            range(0, len(train_data), BATCH_SIZE),
+            range(0, len(epoch_puzzles), BATCH_SIZE),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
         ):
-            training_batch = train_data[start:start + BATCH_SIZE]
+            training_batch = epoch_puzzles[start:start + BATCH_SIZE]
             learner.zero_grad()
 
             start_time = time.time()
