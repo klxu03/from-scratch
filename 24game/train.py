@@ -59,21 +59,21 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
 
     success_count = 0
     cumulative_reward = 0
-    EVAL_BATCH_SIZE = 30
+    EVAL_BATCH_SIZE = 70
     GROUP_SIZE = 1
     with torch.inference_mode():
         ran = 0
         for start in tqdm(range(0, len(puzzles), EVAL_BATCH_SIZE), desc="Evaluating"):
             batch = puzzles[start:start + EVAL_BATCH_SIZE]
             rollouts = actor.collect_rollouts(batch, GROUP_SIZE)
+            ran += len(batch)
             for results in rollouts:
-                ran += 1
                 summed_reward = sum(r.reward for r in results)
                 cumulative_reward += summed_reward
                 if summed_reward > 0:
                     success_count += 1
-                print(f"Successes so far: {success_count}/{ran} \n\n")
-    print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
+            print(f"Successes so far: {success_count}/{ran} \n\n")
+    print(f"\n Success count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward} \n")
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
