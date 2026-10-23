@@ -96,9 +96,8 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        epoch_puzzles = harder_puzzles + [rand_puzzle for rand_puzzle in np.random.choice(len(train_data), size=100, replace=False)]
-        epoch_puzzles.extend(np.random.choice(train_data, size=100, replace=False))
-        # randomly sample 100 puzzles from train_data to add to current set
+        random_indices = np.random.choice(len(train_data), size=100, replace=False)
+        epoch_puzzles = harder_puzzles + [train_data[i] for i in random_indices]
         np.random.shuffle(epoch_puzzles)
         for start in tqdm(
             range(0, len(epoch_puzzles), BATCH_SIZE),
@@ -228,7 +227,7 @@ if __name__ == "__main__":
     *** Regenerated validation
     Hero Train Checkpoint 297: 81/137 
     Hero Train Checkpoint 363: 80/137 
-    Hero Train Checkpoint 398: /137 
+    Hero Train Checkpoint 398: 82/137 
     """
 
     """
