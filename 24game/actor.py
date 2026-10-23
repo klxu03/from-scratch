@@ -3,7 +3,6 @@ from transformers import AutoTokenizer, Qwen3_5ForCausalLM
 from transformers.generation.utils import GenerateOutput
 from env import calculator, verify_solution, execute_tools
 from typing import NamedTuple
-from tqdm import tqdm
 
 import sys
 from pathlib import Path
@@ -147,7 +146,7 @@ class Actor:
             first_turns = self.execute_first_turn(prompt_ids, puzzle, group_size)
 
             group = []
-            for curr_exec in tqdm(first_turns, desc=f"Finishing rollouts for {puzzle}"):
+            for curr_exec in first_turns:
                 turns = [curr_exec.turn]
                 input_ids = torch.cat([prompt_ids, curr_exec.turn.token_ids.to(self.model.device)], dim=1)
 

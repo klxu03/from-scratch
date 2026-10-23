@@ -4,7 +4,6 @@ import matplotlib
 import torch
 from tqdm import tqdm
 from continuous_actor import Actor
-from actor import Actor as OriginalActor
 from learner import Learner
 from lora_linear import apply_lora
 import time
@@ -30,7 +29,6 @@ if DEVICE.type == "cuda":
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
 actor = Actor(model, MAX_OUTPUT_TOKENS)
-# actor = OriginalActor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 avg_reward_path = Path(__file__).resolve().with_name("average_reward.jpg")
@@ -61,15 +59,20 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
 
     success_count = 0
     cumulative_reward = 0
+    EVAL_BATCH_SIZE = 30
+    GROUP_SIZE = 1
     with torch.inference_mode():
-        NUM_PUZZLES = 1
-        for ran, puzzle in enumerate(tqdm(puzzles, desc="Evaluating"), start=1):
-            results = actor.collect_rollouts([puzzle], NUM_PUZZLES)[0]
-            summed_reward = sum(r.reward for r in results)
-            cumulative_reward += summed_reward
-            if summed_reward > 0:
-                success_count += 1
-            print(f"Successes so far: {success_count}/{ran}\n\n")
+        ran = 0
+        for start in tqdm(range(0, len(puzzles), EVAL_BATCH_SIZE), desc="Evaluating"):
+            batch = puzzles[start:start + EVAL_BATCH_SIZE]
+            rollouts = actor.collect_rollouts(batch, GROUP_SIZE)
+            for results in rollouts:
+                ran += 1
+                summed_reward = sum(r.reward for r in results)
+                cumulative_reward += summed_reward
+                if summed_reward > 0:
+                    success_count += 1
+                print(f"Successes so far: {success_count}/{ran} \n\n")
     print(f"\nSuccess count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward}")
     return success_count, cumulative_reward
 
@@ -232,6 +235,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 363: 80/137 
     Hero Train Checkpoint 398: 82/137 
     ** Checkpoint 411 - pruning epoch to just harder puzzles, now 8x24
+    Hero Train Checkpoint 507: /137 
     """
 
     """
@@ -239,7 +243,7 @@ if __name__ == "__main__":
     val_path = Path(__file__).resolve().parent / "data/val.jsonl"
     # print("Evaluating base model")
     # base_success_count, base_reward = eval(None, sanity_path)
-    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_72.pt"
+    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_507.pt"
     print("Evaluating final checkpoint")
     final_success_count, final_reward = eval(checkpoint_path, val_path)
     # print(f"Base model: success count {base_success_count}, reward {base_reward}")
