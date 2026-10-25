@@ -229,6 +229,8 @@ if __name__ == "__main__":
     Hero Train Checkpoint 799: 87/137 and 86/137, with 4096 token limit: 108/137
     Hero Train Checkpoint 819 [4096 token limit]: 114/137, 107/137, 107/137
     Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
+    ** Checkpoint 951 - further pruned with one forced hard puzzle, upped token limit 2048 -> 4096
+    Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
     """
 
     """
@@ -236,7 +238,7 @@ if __name__ == "__main__":
     val_path = Path(__file__).resolve().parent / "data/val.jsonl"
     # print("Evaluating base model")
     # base_success_count, base_reward = eval(None, sanity_path)
-    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_918.pt"
+    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_1000.pt"
     print("Evaluating final checkpoint")
     final_success_count, final_reward = eval(checkpoint_path, val_path)
     # print(f"Base model: success count {base_success_count}, reward {base_reward}")
