@@ -202,6 +202,7 @@ class Actor:
             elif reached_max_tokens:
                 rollout.reward = 0
             else:
+                # make sure to handle edge case where new next_prompt will push over generation limit
                 next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, tool_results)
                 next_prompt_ids = self.tokenizer(next_prompt, add_special_tokens=False, return_tensors="pt")["input_ids"]
                 rollout.turns[-1].append(Turn(next_prompt_ids, next_prompt_ids.shape[1]))
@@ -211,7 +212,6 @@ class Actor:
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
         self._evict_batch(rows_to_keep)
-
 
     def collect_rollouts(self, puzzles: list[list[int]], group_size: int = 8) -> list[list[Rollout]]:
         self.group_size = group_size
@@ -223,7 +223,10 @@ class Actor:
             while self._unfinished_rollouts():
                 remaining = self._unfinished_rollouts()
                 if self.batch is None:
+                    # add logging if we ended up prefilling, and if not decode how many active right now
                     self._rebuild(remaining)
                 self._advance(remaining)
         finally:
             print(f"Collected rollouts in {time.time() - start_time:.2f} seconds")
+        
+        return [rollout_manager.rollouts for rollout_manager in self.rollout_managers]

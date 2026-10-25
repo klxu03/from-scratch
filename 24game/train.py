@@ -14,7 +14,7 @@ import csv
 import time
 
 MODEL = "Qwen/Qwen3.5-0.8B"
-MAX_OUTPUT_TOKENS = 2048
+MAX_OUTPUT_TOKENS = 4096
 # Only place the training device is chosen. Actor and learner follow model.device.
 DEVICE = (
     torch.device("cuda") if torch.cuda.is_available()
@@ -64,7 +64,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 8
+    BATCH_SIZE = 6
     GROUP_SIZE = 24
 
     if checkpoint_path is not None:
@@ -78,7 +78,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             train_data.append(list(map(int, line.split()))) 
 
     # train_data = [[6, 6, 6, 6]] * 150 
-    harder_puzzles = train_data[-220:]
+    harder_puzzles = train_data[-180:]
     avg_rewards = initial_avg_rewards
 
     log_memory(0, "initialized", model.device)
@@ -88,17 +88,20 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        random_indices = np.random.choice(len(train_data), size=100, replace=False)
+        random_indices = np.random.choice(len(train_data), size=30, replace=False)
         epoch_puzzles = harder_puzzles + [train_data[i] for i in random_indices]
         np.random.shuffle(epoch_puzzles)
         for start in tqdm(
-            range(0, len(epoch_puzzles), BATCH_SIZE),
+            range(0, len(epoch_puzzles), BATCH_SIZE - 1),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
         ):
-            training_batch = epoch_puzzles[start:start + BATCH_SIZE]
+            training_batch = epoch_puzzles[start:start + BATCH_SIZE - 1]
+            # force one hard puzzle at the end, from train_data last 11 rows
+            hard_puzzle = train_data[-11 + np.random.randint(11)]
+            training_batch.append(hard_puzzle)
             learner.zero_grad()
 
             start_time = time.time()
