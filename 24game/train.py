@@ -1,6 +1,5 @@
 from pathlib import Path
 from transformers import Qwen3_5ForCausalLM
-import matplotlib
 import torch
 from tqdm import tqdm
 from continuous_actor import Actor
@@ -8,9 +7,7 @@ from learner import Learner
 from lora_linear import apply_lora
 import time
 import numpy as np
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from graph import create_rolling
 
 import psutil
 import csv
@@ -33,18 +30,8 @@ learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 avg_reward_path = Path(__file__).resolve().with_name("average_reward.jpg")
 avg_reward_csv_path = Path(__file__).resolve().with_name("average_rewards.csv")
+rolling_avg_path = Path(__file__).resolve().with_name("rolling_avg.jpg")
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
-
-def create_graph(path: Path, values: list[float], title: str, xlabel: str, ylabel: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    plt.figure()
-    plt.plot(values, marker="o")
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.tight_layout()
-    plt.savefig(path)
-    plt.close()
 
 def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     if checkpoint_path is not None:
@@ -151,17 +138,13 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             print(f"Average reward: {avg_reward}")
             print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}\n")
 
-            create_graph(avg_reward_path, avg_rewards, "GRPO average reward", "step", "average reward")
+            create_rolling(avg_reward_path, avg_rewards, [1], title="GRPO average reward")
+            create_rolling(rolling_avg_path, avg_rewards, [5, 20, 40], title="GRPO rolling average")
+
             empty_device_cache(model.device)
             log_memory((start // BATCH_SIZE) + 1, "after_empty_cache", model.device)
 
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
-
-    create_graph(avg_reward_path, avg_rewards, "GRPO average reward", "step", "average reward")
-    log_memory(len(train_data), "finished", model.device)
-    learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / "final.pt")
-
-_PROCESS = psutil.Process()
 
 def empty_device_cache(device: torch.device) -> None:
     if device.type == "cuda":
@@ -179,6 +162,7 @@ def _device_memory(device: torch.device) -> tuple[int, int]:
         return torch.mps.current_allocated_memory(), torch.mps.driver_allocated_memory()
     return 0, 0
 
+_PROCESS = psutil.Process()
 def log_memory(step: int, phase: str = "after_step", device: torch.device | None = None) -> dict:
     """Record memory without clearing gradients, objects, or caches."""
     if device is None:
@@ -235,7 +219,13 @@ if __name__ == "__main__":
     Hero Train Checkpoint 363: 80/137 
     Hero Train Checkpoint 398: 82/137 
     ** Checkpoint 411 - pruning epoch to just harder puzzles, now 8x24
-    Hero Train Checkpoint 507: /137 
+    Hero Train Checkpoint 398: 72/137 
+    Hero Train Checkpoint 507: 77/137 and 85/137 
+    Hero Train Checkpoint 647: 89/137 and 85/137
+    Hero Train Checkpoint 751: 92/137 and 87/137
+    Hero Train Checkpoint 799: 87/137 and 86/137, with 4096 token limit: 108/137
+    Hero Train Checkpoint 819 [4096 token limit]: 114/137, 107/137, 107/137
+    Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
     """
 
     """
@@ -243,7 +233,7 @@ if __name__ == "__main__":
     val_path = Path(__file__).resolve().parent / "data/val.jsonl"
     # print("Evaluating base model")
     # base_success_count, base_reward = eval(None, sanity_path)
-    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_507.pt"
+    checkpoint_path = Path(__file__).resolve().parent / "checkpoints/checkpoint_918.pt"
     print("Evaluating final checkpoint")
     final_success_count, final_reward = eval(checkpoint_path, val_path)
     # print(f"Base model: success count {base_success_count}, reward {base_reward}")
