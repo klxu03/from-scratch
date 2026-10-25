@@ -243,7 +243,7 @@ if __name__ == "__main__":
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
     """
 
-    starting_checkpoint = 411
+    starting_checkpoint = 951
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
