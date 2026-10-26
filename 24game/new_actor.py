@@ -159,7 +159,7 @@ class Actor:
         ids = pad_sequence(histories, batch_first=True, padding_side="left", padding_value=self.pad_id).to(self.model.device)
         mask = pad_sequence([torch.ones_like(h) for h in histories], batch_first=True, padding_side="left", padding_value=0).to(self.model.device)
         cache = DynamicCache(config=self.model.config)
-        self.batch = Batch(ids, mask, rollout_ids, [width - h.numel() for h in histories], cache, len(rollout_ids))
+        self.batch = Batch(ids, mask, rollout_ids.copy(), [width - h.numel() for h in histories], cache, len(rollout_ids))
         for rollout_id, history in zip(rollout_ids, histories):
             self.rollout_manager(rollout_id).rollout(rollout_id).history_token_count = history.numel()
 
@@ -240,7 +240,7 @@ class Actor:
         remaining[:] = self._unfinished_rollouts()
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
         if len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold:
-            print(f"[Prefill Next] {len(rows_to_keep)} remain | {len(remaining) - len(rows_to_keep)} waiting")
+            print(f"[Prefill] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
             for row in rows_to_keep:
                 rollout_id = self.batch.rollout_ids[row]
                 rollout = self.rollout_manager(rollout_id).rollout(rollout_id)
@@ -249,7 +249,7 @@ class Actor:
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
-        print(f"[Decode] {len(rows_to_keep)} rollouts | {len(remaining) - len(rows_to_keep)} waiting")
+        print(f"[Decode] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
         if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
 

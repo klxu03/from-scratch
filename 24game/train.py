@@ -102,7 +102,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         ):
             training_batch = epoch_puzzles[start:start + BATCH_SIZE - HARD_PER_BATCH].copy()
             # force HARD_PER_BATCH hard puzzles at the end
-            hard_start = len(avg_rewards) % len(hard_pool)
+            hard_start = update_step % len(hard_pool)
 
             training_batch.extend(
                 hard_pool[(hard_start + i) % len(hard_pool)]
@@ -122,7 +122,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             for i, rollout_group in enumerate(rollouts):
                 learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * len(training_batch))
             avg_reward = learner.step() / (GROUP_SIZE * len(training_batch))
-            log_memory((start // BATCH_SIZE) + 1, device=model.device)
+            log_memory(update_step + 1, device=model.device)
             step_time = time.time()
             avg_rewards.append(avg_reward)
             with avg_reward_csv_path.open("a") as f:
@@ -152,7 +152,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             create_rolling(rolling_avg_path, avg_rewards, [5, 20, 40], title="GRPO rolling average")
 
             empty_device_cache(model.device)
-            log_memory((start // BATCH_SIZE) + 1, "after_empty_cache", model.device)
+            log_memory(update_step + 1, "after_empty_cache", model.device)
 
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
     ** Checkpoint 951 - further pruned with one forced hard puzzle, upped token limit 2048 -> 4096
     Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
-    Hero Train Checkpoint 1066 [4096 token limit]: 117/137, 115/137
+    Hero Train Checkpoint 1066 [4096 token limit]: 117/137, 115/137, 112/137
     """
 
     """
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
     """
 
-    starting_checkpoint = 951
+    starting_checkpoint = 1071
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
