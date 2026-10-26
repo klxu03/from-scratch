@@ -65,6 +65,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
     BATCH_SIZE = 6
+    HARD_PER_BATCH = 3
     GROUP_SIZE = 24
 
     if checkpoint_path is not None:
@@ -78,7 +79,8 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             train_data.append(list(map(int, line.split()))) 
 
     # train_data = [[6, 6, 6, 6]] * 150 
-    harder_puzzles = train_data[-180:]
+    medium_hard_puzzles = train_data[-170:]
+    hard_pool = train_data[-11:]
     avg_rewards = initial_avg_rewards
 
     log_memory(0, "initialized", model.device)
@@ -89,19 +91,24 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     while True:
         epoch += 1
         random_indices = np.random.choice(len(train_data), size=30, replace=False)
-        epoch_puzzles = harder_puzzles + [train_data[i] for i in random_indices]
+        epoch_puzzles = medium_hard_puzzles + [train_data[i] for i in random_indices]
         np.random.shuffle(epoch_puzzles)
         for start in tqdm(
-            range(0, len(epoch_puzzles), BATCH_SIZE - 1),
+            range(0, len(epoch_puzzles), BATCH_SIZE - HARD_PER_BATCH),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
         ):
-            training_batch = epoch_puzzles[start:start + BATCH_SIZE - 1]
-            # force one hard puzzle at the end, from train_data last 11 rows
-            hard_puzzle = train_data[-11 + np.random.randint(11)]
-            training_batch.append(hard_puzzle)
+            training_batch = epoch_puzzles[start:start + BATCH_SIZE - HARD_PER_BATCH].copy()
+            # force HARD_PER_BATCH hard puzzles at the end
+            hard_indices = hard_pool[
+                (len(avg_rewards) + np.arange(HARD_PER_BATCH)) % len(hard_pool)
+            ]
+            training_batch.extend(
+                hard_pool[int(i)] for i in hard_indices
+            )
+
             learner.zero_grad()
 
             start_time = time.time()
@@ -231,7 +238,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
     ** Checkpoint 951 - further pruned with one forced hard puzzle, upped token limit 2048 -> 4096
     Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
-    Hero Train Checkpoint 1066 [4096 token limit]: /137
+    Hero Train Checkpoint 1066 [4096 token limit]: 117/137
     """
 
     """
