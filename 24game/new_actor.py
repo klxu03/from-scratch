@@ -105,7 +105,7 @@ class Actor:
             for index in range(input_ids.shape[0]):
                 if input_ids.shape[1] > self.actor.batch.left_padding[index] + self.actor.rollout_manager(self.actor.batch.rollout_ids[index]).rollout(self.actor.batch.rollout_ids[index]).history_token_count:
                     generated_beyond_queued_prefix[index] = True
-            generated_beyond_queued_prefix = generated_beyond_queued_prefix.to(self.model.device)
+            generated_beyond_queued_prefix = generated_beyond_queued_prefix.to(self.actor.model.device)
             eligible_eos = sampled_eos & generated_beyond_queued_prefix
             return eligible_eos.any().expand(input_ids.shape[0])
 
@@ -164,7 +164,7 @@ class Actor:
             self.rollout_manager(rollout_id).rollout(rollout_id).history_token_count = history.numel()
 
     def _evict_batch(self, rows_to_keep: list[int]) -> None:
-        if rows_to_keep.empty():
+        if not rows_to_keep:
             self.batch = None
             return
 
@@ -217,7 +217,8 @@ class Actor:
                 rows_to_keep.append(index)
                 continue
             rollout.turns[-1].token_ids = sequences[index, self.batch.left_padding[index] + (rollout.history_token_count - rollout.turns[-1].token_ids.numel()):].cpu()
-            response = row[(self.batch.left_padding[index] + rollout.len_until_last_turn_prompt):].cpu()
+            rollout.history_token_count = real_length
+            response = rollout.turns[-1].token_ids[rollout.turns[-1].completion_start:]
 
             text = self.tokenizer.decode(response, skip_special_tokens=True)
             tool_results = execute_tools(text, self.rollout_manager(rollout_id).puzzle)
