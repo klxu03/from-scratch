@@ -239,6 +239,7 @@ class Actor:
 
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
         if len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold:
+            print(f"[Prefill Next] {len(rows_to_keep)} remain | {len(remaining) - len(rows_to_keep)} waiting")
             for row in rows_to_keep:
                 rollout_id = self.batch.rollout_ids[row]
                 rollout = self.rollout_manager(rollout_id).rollout(rollout_id)
@@ -247,6 +248,7 @@ class Actor:
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
+        print(f"[Decode] {len(rows_to_keep)} rollouts | {len(remaining) - len(rows_to_keep)} waiting")
         if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
 
@@ -260,7 +262,6 @@ class Actor:
             while self._unfinished_rollouts():
                 remaining = self._unfinished_rollouts()
                 if self.batch is None:
-                    # add logging if we ended up prefilling, and if not decode how many active right now
                     self._rebuild(remaining)
                 self._advance(remaining)
         finally:
@@ -271,12 +272,26 @@ class Actor:
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device).eval()
-    actor = Actor(model)
+    MAX_OUTPUT_TOKENS = 2048
+    actor = Actor(model, max_output_tokens=MAX_OUTPUT_TOKENS, tail_threshold=4)
     puzzles = [[8, 3, 8, 3], [6, 6, 6, 6]]
     group_size = 8
     rollouts = actor.collect_rollouts(puzzles, group_size=group_size)
     for puzzle, group in zip(puzzles, rollouts):
         successes = sum(rollout.reward for rollout in group)
+        prompt_len = actor.tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt(MAX_OUTPUT_TOKENS, puzzle)}],
+            tools=[calculator],
+            tokenize=True,
+            add_generation_prompt=True,
+            enable_thinking=True,
+            return_dict=True,
+            return_tensors="pt",
+        )["input_ids"].squeeze(0).numel()
         print(f"Puzzle {puzzle}: {successes}/{group_size} successes")
         for i, rollout in enumerate(group, start=1):
             print(f"Rollout {i}: {len(rollout.turns)} turns, reward {rollout.reward}")
+            summed_len = prompt_len
+            for turn in rollout.turns:
+                summed_len += turn.token_ids.numel()
+            print(f"Summed length: {summed_len} / {MAX_OUTPUT_TOKENS}")

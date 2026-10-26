@@ -231,6 +231,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
     ** Checkpoint 951 - further pruned with one forced hard puzzle, upped token limit 2048 -> 4096
     Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
+    Hero Train Checkpoint 1066 [4096 token limit]: /137
     """
 
     """
