@@ -237,7 +237,7 @@ class Actor:
                 rollout.history_token_count = self.rollout_manager(rollout_id).history(rollout_id).numel()
                 refreshed_rows.append(index)
 
-        remaining = self._unfinished_rollouts()
+        remaining[:] = self._unfinished_rollouts()
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
         if len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold:
             print(f"[Prefill Next] {len(rows_to_keep)} remain | {len(remaining) - len(rows_to_keep)} waiting")
@@ -260,8 +260,8 @@ class Actor:
         try:
             self._initialize(puzzles)
             self.model.eval()
-            while self._unfinished_rollouts():
-                remaining = self._unfinished_rollouts()
+            remaining = self._unfinished_rollouts()
+            while remaining:
                 if self.batch is None:
                     self._rebuild(remaining)
                 self._advance(remaining)

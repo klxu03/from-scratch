@@ -90,7 +90,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        random_indices = np.random.choice(len(train_data), size=30, replace=False)
+        random_indices = np.random.choice(len(train_data), size=40, replace=False)
         epoch_puzzles = medium_hard_puzzles + [train_data[i] for i in random_indices]
         np.random.shuffle(epoch_puzzles)
         for start in tqdm(
@@ -102,11 +102,11 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         ):
             training_batch = epoch_puzzles[start:start + BATCH_SIZE - HARD_PER_BATCH].copy()
             # force HARD_PER_BATCH hard puzzles at the end
-            hard_indices = hard_pool[
-                (len(avg_rewards) + np.arange(HARD_PER_BATCH)) % len(hard_pool)
-            ]
+            hard_start = len(avg_rewards) % len(hard_pool)
+
             training_batch.extend(
-                hard_pool[int(i)] for i in hard_indices
+                hard_pool[(hard_start + i) % len(hard_pool)]
+                for i in range(HARD_PER_BATCH)
             )
 
             learner.zero_grad()
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 918: 85/137 and 86/137, with 4096 token limit: 111/137, 115/137, 113/137
     ** Checkpoint 951 - further pruned with one forced hard puzzle, upped token limit 2048 -> 4096
     Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
-    Hero Train Checkpoint 1066 [4096 token limit]: 117/137
+    Hero Train Checkpoint 1066 [4096 token limit]: 117/137, 115/137
     """
 
     """
