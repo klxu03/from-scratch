@@ -193,6 +193,7 @@ class Actor:
                 top_p=1.0,
                 repetition_penalty=1.0,
                 top_k=0,
+                prefill_chunk_size=512 if (self.batch.cache is None) else None,
             )
             sequences = output.sequences
             last_tokens = sequences[:, -1].cpu().tolist()

@@ -64,7 +64,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 6
+    BATCH_SIZE = 5
     HARD_PER_BATCH = 3
     GROUP_SIZE = 24
 
@@ -259,7 +259,7 @@ if __name__ == "__main__":
     Hero Train Checkpoint 992 [4096 token limit]: 112/137, 115/137
     Hero Train Checkpoint 1066 [4096 token limit]: 117/137, 115/137, 112/137
     ** Checkpoint 1071 - out of 6, at least 3 puzzles are forced hard. forced hards are evenly distributed
-    ** Checkpoint 1073 - fixed a hard puzzle pool based on empirically low success rates
+    ** Checkpoint 1077 - lower batch -> 5, added prefill_chunk_size, and pytorch alloc conf expandable memory segments for OOM. fixed a hard puzzle pool based on empirically low success rates
     """
 
     """
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
     """
 
-    starting_checkpoint = 1073
+    starting_checkpoint = 1077
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]

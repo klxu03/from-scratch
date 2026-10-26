@@ -266,6 +266,7 @@ class Actor(OriginalActor):
                         output_logits=False,
                         output_attentions=False,
                         output_hidden_states=False,
+                        prefill_chunk_size=512 if (cache is None) else None,
                     )
                 self._synchronize()
                 elapsed = time.perf_counter() - tick
