@@ -1,7 +1,6 @@
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from transformers import DynamicCache
-from typing import NamedTuple
 from transformers import AutoTokenizer, Qwen3_5ForCausalLM, LogitsProcessor, LogitsProcessorList, StoppingCriteria, StoppingCriteriaList
 from dataclasses import dataclass
 import time
@@ -12,7 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils.prompts import prompt
 
-class Turn(NamedTuple):
+@dataclass
+class Turn:
     """
     A single turn of the actor, containing this turn's token ids. Former is prompt, latter is completion
     The very first turn omits the prompt (as it's just the initial prompt), future turns are just continuations
@@ -25,6 +25,10 @@ class Rollout:
     turns: list[Turn]
     reward: float
     history_token_count: int
+
+    @property
+    def len_until_last_turn_prompt(self) -> int:
+        return self.history_token_count - (len(self.turns[-1].token_ids) - self.turns[-1].completion_start) 
 
 @dataclass
 class RolloutManager:
@@ -100,13 +104,13 @@ class Actor:
             for index, candidate in enumerate(sampled_eos):
                 if candidate:
                     rollout_id = self.actor.batch.rollout_ids[index]
-                    next_id_from_back = self.actor.get_next_injected_token_index(rollout_id, input_ids.shape[1])
+                    next_id_from_back = self.actor.get_next_injected_token_index(rollout_id, input_ids.shape[1] - self.actor.batch.left_padding[index])
                     if next_id_from_back <= 0:
                         return torch.tensor(True, device=self.actor.model.device).expand(input_ids.shape[0])
 
             return torch.tensor(False, device=self.actor.model.device).expand(input_ids.shape[0])
 
-    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = -1, rebuild_threshold: float = 0.25):
+    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = 24, rebuild_threshold: float = 0.25):
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
@@ -115,11 +119,11 @@ class Actor:
         self.tail_threshold = tail_threshold
         self.injector = LogitsProcessorList([self.Injector(self)])
         self.stopper = StoppingCriteriaList([self.Stopper(self)])
+        self.rebuild_threshold = rebuild_threshold
 
     def _initialize(self, puzzles: list[list[int]]) -> None:
         self.rollout_managers: list[RolloutManager] = []
         starting_rollout_id = 0
-        if self.tail_threshold < 0: self.tail_threshold = len(puzzles) * self.group_size // 8
 
         for puzzle in puzzles:
             prompt_ids = self.tokenizer.apply_chat_template(
@@ -187,19 +191,27 @@ class Actor:
                 repetition_penalty=1.0,
                 top_k=0,
             )
-            sequences = output.sequences.cpu()
+            sequences = output.sequences
+            generated_len = sequences.shape[1] - self.batch.input_ids.shape[1]
+            self.batch.input_ids = sequences
+            self.batch.attention_mask = torch.cat([
+                self.batch.attention_mask,
+                self.batch.attention_mask.new_ones(self.batch.attention_mask.shape[0], generated_len),
+            ], dim=1)
+            self.batch.cache = output.past_key_values
 
         # check for things to evict (last token is eos)
         rows_to_keep = []
         refreshed_rows = [] # rows that have been refreshed with a new turn
         for index, row in enumerate(sequences):
             rollout = self.rollout_manager(self.batch.rollout_ids[index]).rollout(self.batch.rollout_ids[index])
-            response = row[(self.batch.left_padding[index] + rollout.history_token_count):]
             real_length = sequences.shape[1] - self.batch.left_padding[index]
-            if not (response[-1] == self.eos_id or real_length >= self.max_output_tokens):
+            if not (row[-1] == self.eos_id or real_length >= self.max_output_tokens):
                 # didn't EOS or reached max output tokens
                 rows_to_keep.append(index)
                 continue
+            rollout.turns[-1].token_ids = sequences[index, self.batch.left_padding[index] + (rollout.history_token_count - len(rollout.turns[-1])):].cpu()
+            response = row[(self.batch.left_padding[index] + rollout.len_until_last_turn_prompt):].cpu()
 
             text = self.tokenizer.decode(response, skip_special_tokens=True)
             tool_results = execute_tools(text, self.rollout_manager(self.batch.rollout_ids[index]).puzzle)
@@ -207,23 +219,29 @@ class Actor:
 
             if any(verify_solution(result, self.rollout_manager(self.batch.rollout_ids[index]).puzzle) for result in tool_results):
                 rollout.reward = 1
-            elif real_length >= self.max_output_tokens:
+                continue
+
+            next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, tool_results)
+            next_prompt_ids = self.tokenizer(next_prompt, add_special_tokens=False, return_tensors="pt")["input_ids"].squeeze(0)
+
+            if rollout.history_token_count + next_prompt_ids.numel() >= self.max_output_tokens:
                 rollout.reward = 0
             else:
-                # make sure to handle edge case where new next_prompt will push over generation limit
-                next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, tool_results)
-                next_prompt_ids = self.tokenizer(next_prompt, add_special_tokens=False, return_tensors="pt")["input_ids"].squeeze(0)
-                rollout.turns[-1].append(Turn(next_prompt_ids, next_prompt_ids.numel()))
-                rollout.history_token_count += next_prompt_ids.numel() + response.numel()
+                rollout.turns.append(Turn(next_prompt_ids, next_prompt_ids.numel()))
+                rollout.history_token_count += next_prompt_ids.numel()
                 refreshed_rows.append(index)
-        
+
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
-        if len(remaining) > self.tail_threshold and len(remaining) <= self.batch.cohort_start_size * self.rebuild_threshold:
+        if len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold:
+            for row in rows_to_keep:
+                rollout_id = self.batch.rollout_ids[row]
+                rollout = self.rollout_manager(rollout_id).rollout(rollout_id)
+                rollout.turns[-1].token_ids = sequences[row, self.batch.left_padding[row] + rollout.len_until_last_turn_prompt:].cpu()
             self.batch = None
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
-        if len(rows_to_keep) < len(remaining):
+        if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
 
     def collect_rollouts(self, puzzles: list[list[int]], group_size: int = 8) -> list[list[Rollout]]:
@@ -243,3 +261,16 @@ class Actor:
             print(f"Collected rollouts in {time.time() - start_time:.2f} seconds")
         
         return [rollout_manager.rollouts for rollout_manager in self.rollout_managers]
+
+if __name__ == "__main__":
+    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device).eval()
+    actor = Actor(model)
+    puzzles = [[8, 3, 8, 3], [6, 6, 6, 6]]
+    group_size = 8
+    rollouts = actor.collect_rollouts(puzzles, group_size=group_size)
+    for puzzle, group in zip(puzzles, rollouts):
+        successes = sum(rollout.reward for rollout in group)
+        print(f"Puzzle {puzzle}: {successes}/{group_size} successes")
+        for i, rollout in enumerate(group, start=1):
+            print(f"Rollout {i}: {len(rollout.turns)} turns, reward {rollout.reward}")
