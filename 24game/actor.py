@@ -67,7 +67,7 @@ def continuation_suffix(tokenizer: AutoTokenizer, prefix_ids: torch.Tensor, tool
     return close + tools + "<|im_start|>assistant\n<think>\n"
 
 class Actor:
-    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = 24, rebuild_threshold: float = 0.25):
+    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = 18, rebuild_threshold: float = 0.25):
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
