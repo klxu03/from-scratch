@@ -98,11 +98,16 @@ def tool_response(tool_results: list[str], puzzle: list[int]) -> list[str]:
     for result in tool_results:
         expression, _, value = result.partition(" = ")
         used = numbers_used(expression)
-        used_text = "invalid (every literal must be an integer)" if used is False else str(used)
-        responses.append(
-            f"{result}\n"
-            f"Expression result: {value}\n"
-            f"Numbers used: {used_text}\n"
-            f"Use only the puzzle numbers, each exactly once: {puzzle}"
-        )
+        if used is False:
+            responses.append(f"Calculator result: {value}\nNumbers used: invalid\nInvalid card usage.")
+            continue
+        missing = list((Counter(puzzle) - Counter(used)).elements())
+        extra = list((Counter(used) - Counter(puzzle)).elements())
+        lines = [
+            f"Calculator result: {value}",
+            f"Numbers used: {used}",
+        ]
+        if missing or extra:
+            lines += ["Invalid card usage.", f"Missing: {missing}", f"Extra: {extra}"]
+        responses.append("\n".join(lines))
     return responses

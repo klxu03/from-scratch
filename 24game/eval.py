@@ -107,7 +107,12 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
     )
     return puzzle_success_rate
 
-def solve(puzzle: list[int]) -> bool:
+def solve(puzzle: list[int], checkpoint_path: Path | None = None) -> bool:
+    if checkpoint_path is not None:
+        learner.load_checkpoint(checkpoint_path)
+        print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
+
+    model.eval()
     ATTEMPTS = 30
     with torch.inference_mode():
         rollouts = actor.collect_rollouts([puzzle], ATTEMPTS)[0]
@@ -185,11 +190,20 @@ if __name__ == "__main__":
     With (tuple) instead of [list] for puzzle
     Run 1: easy 90/115, medium 15/20, hard 1/2
     Run 2: easy 94/115, medium 17/20, hard 0/2
+
+    Env now provides numbers used
+    Run 1: easy 90/115, medium 15/20, hard 1/2
+    Run 2: easy 94/115, medium 15/20, hard 1/2
+    Run 3: easy 90/115, medium 16/20, hard 0/2
+    Total: easy 366/460, medium 62/80, hard 2/8
+    Success count: 127
+
+    Env now provides missing/extra
     """
 
-    """
-    CHECKPOINT = 1135
+    CHECKPOINT = 1210
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
+    """
     print(f"Evaluating checkpoint {CHECKPOINT}")
     puzzle_success_rate = eval(checkpoint_path, VAL_PATH)
 
@@ -197,4 +211,4 @@ if __name__ == "__main__":
     print(f"Success count: {success_count}")
     """
 
-    solve([10, 4, 10, 2])
+    solve([10, 4, 10, 2], checkpoint_path)

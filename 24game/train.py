@@ -72,6 +72,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         [7, 12, 8, 8],
         [8, 13, 8, 8],
         [2, 12, 2, 11],
+        [10, 4, 10, 2],
     ]
     avg_rewards = initial_avg_rewards
 
