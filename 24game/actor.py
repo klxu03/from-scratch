@@ -178,6 +178,7 @@ class Actor:
     def _advance(self, remaining: list[int]) -> None:
         min_left_padding = min(self.batch.left_padding)
         limit = self.max_output_tokens - self.batch.input_ids.shape[1] + min_left_padding
+        start = time.time()
         with torch.inference_mode():
             output = self.model.generate(
                 input_ids=self.batch.input_ids,
@@ -244,7 +245,7 @@ class Actor:
         phase_1_need_rebuild = len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold
         transition_to_phase_2 = len(remaining) <= self.tail_threshold and len(remaining) != (len(rows_to_keep) + len(refreshed_rows))
         if phase_1_need_rebuild or transition_to_phase_2:
-            print(f"[Prefill] {len(remaining)} rows")
+            print(f"[Prefill Next] {len(remaining)} rows in {time.time() - start:.2f} seconds")
             for row in rows_to_keep:
                 rollout_id = self.batch.rollout_ids[row]
                 rollout = self.rollout_manager(rollout_id).rollout(rollout_id)
@@ -253,7 +254,7 @@ class Actor:
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
-        print(f"[Decode] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
+        print(f"[Decode Next] limit {limit} | {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting in {time.time() - start:.2f} seconds")
         if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
 

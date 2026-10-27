@@ -133,6 +133,11 @@ if __name__ == "__main__":
     ** Checkpoint 1071 - out of 6, at least 3 puzzles are forced hard. forced hards are evenly distributed
     ** Checkpoint 1077 - lower batch -> 5, added prefill_chunk_size, and pytorch alloc conf expandable memory segments for OOM. fixed a hard puzzle pool based on empirically low success rates
     Hero Train Checkpoint 1127: 109/137, New Inference Engine | 103/137, 105/137, 109/137 
+    ** Checkpoint 1135 - batch to 6, 2 forced hards, new inference engine
+    """
+
+    """
+    New Eval Scripts
     """
 
     CHECKPOINT = 1135
