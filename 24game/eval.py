@@ -5,7 +5,12 @@ from tqdm import tqdm
 from actor import Actor
 from learner import Learner
 from lora_linear import apply_lora
-from train import empty_device_cache
+
+def empty_device_cache(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    elif device.type == "mps":
+        torch.mps.empty_cache()
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 4096
@@ -58,14 +63,14 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
     for line in Path(data_path).read_text().splitlines():
         if line.strip():
             puzzle = tuple(int(n) for n in line.split())
-            puzzles.append(puzzle)
+            puzzles.append(list(puzzle))
 
     RUNS_PER_PUZZLE = 4
     group_counts = {name: 0 for name in PUZZLE_GROUPS}
     puzzle_success_rate: dict[tuple[int, ...], float] = {}
     for puzzle in puzzles:
         group_counts[puzzle_groups[tuple(puzzle)]] += 1
-        puzzle_success_rate[puzzle] = 0
+        puzzle_success_rate[tuple(puzzle)] = 0
     totals = {name: 0 for name in PUZZLE_GROUPS}
 
     with torch.inference_mode():
@@ -75,14 +80,14 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
             for index, (puzzle, group) in enumerate(zip(puzzles, rollouts)):
                 name = puzzle_groups[tuple(puzzle)]
                 run_rewards[name] += group[0].reward
-                puzzle_success_rate[puzzle] += group[0].reward
+                puzzle_success_rate[tuple(puzzle)] += group[0].reward
 
                 if run == 0:
                     history = torch.cat([
                         actor.rollout_managers[index].prompt_ids,
                         *(turn.token_ids for turn in group[0].turns),
                     ])
-                    text = actor.tokenizer.decode(history, skip_special_tokens=True)
+                    text = actor.tokenizer.decode(history, skip_special_tokens=False)
                     trace_path = traces_dir / f"{'_'.join(map(str, puzzle))}.txt"
                     trace_path.write_text(text)
 
