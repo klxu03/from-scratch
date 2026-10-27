@@ -21,7 +21,34 @@ model = apply_lora(model)
 actor = Actor(model, MAX_OUTPUT_TOKENS)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
-def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
+EASY_PUZZLES = Path(__file__).resolve().parent / "data/easy.jsonl"
+MEDIUM_PUZZLES = Path(__file__).resolve().parent / "data/medium.jsonl"
+HARD_PUZZLES = Path(__file__).resolve().parent / "data/hard.jsonl"
+PUZZLE_GROUPS = ("easy", "medium", "hard")
+
+VAL_PATH = Path(__file__).resolve().parent / "data/val.jsonl"
+
+def load_puzzle_groups() -> dict[tuple[int, ...], str]:
+    groups = {}
+    val_set = {
+        tuple(int(n) for n in line.split())
+        for line in VAL_PATH.read_text().splitlines()
+        if line.strip()
+    }
+    for name, path in zip(PUZZLE_GROUPS, (EASY_PUZZLES, MEDIUM_PUZZLES, HARD_PUZZLES)):
+        for line in path.read_text().splitlines():
+            if line.strip():
+                puzzle = tuple(int(n) for n in line.split())
+                if puzzle in val_set:
+                    groups[puzzle] = name
+    return groups
+
+puzzle_groups = load_puzzle_groups()
+
+traces_dir = Path(__file__).resolve().parent / "traces"
+traces_dir.mkdir(parents=True, exist_ok=True)
+
+def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...], float]:
     if checkpoint_path is not None:
         learner.load_checkpoint(checkpoint_path)
         print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
@@ -30,27 +57,50 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     puzzles = []
     for line in Path(data_path).read_text().splitlines():
         if line.strip():
-            puzzles.append(list(map(int, line.split())))
+            puzzle = tuple(int(n) for n in line.split())
+            puzzles.append(puzzle)
 
-    success_count = 0
-    cumulative_reward = 0
-    EVAL_BATCH_SIZE = 144
-    GROUP_SIZE = 1
+    RUNS_PER_PUZZLE = 4
+    group_counts = {name: 0 for name in PUZZLE_GROUPS}
+    puzzle_success_rate: dict[tuple[int, ...], float] = {}
+    for puzzle in puzzles:
+        group_counts[puzzle_groups[tuple(puzzle)]] += 1
+        puzzle_success_rate[puzzle] = 0
+    totals = {name: 0 for name in PUZZLE_GROUPS}
+
     with torch.inference_mode():
-        ran = 0
-        for start in tqdm(range(0, len(puzzles), EVAL_BATCH_SIZE), desc="Evaluating"):
-            batch = puzzles[start:start + EVAL_BATCH_SIZE]
-            rollouts = actor.collect_rollouts(batch, GROUP_SIZE)
-            ran += len(batch)
-            for results in rollouts:
-                summed_reward = sum(r.reward for r in results)
-                cumulative_reward += summed_reward
-                if summed_reward > 0:
-                    success_count += 1
-            print(f"Successes so far: {success_count}/{ran} \n\n")
-    print(f"\n Success count: {success_count}/{len(puzzles)}, Cumulative reward: {cumulative_reward} \n")
-    empty_device_cache(DEVICE)
-    return success_count, cumulative_reward
+        for run in tqdm(range(RUNS_PER_PUZZLE), desc="Evaluating"):
+            rollouts = actor.collect_rollouts(puzzles, 1)
+            run_rewards = {name: 0.0 for name in PUZZLE_GROUPS}
+            for index, (puzzle, group) in enumerate(zip(puzzles, rollouts)):
+                name = puzzle_groups[tuple(puzzle)]
+                run_rewards[name] += group[0].reward
+                puzzle_success_rate[puzzle] += group[0].reward
+
+                if run == 0:
+                    history = torch.cat([
+                        actor.rollout_managers[index].prompt_ids,
+                        *(turn.token_ids for turn in group[0].turns),
+                    ])
+                    text = actor.tokenizer.decode(history, skip_special_tokens=True)
+                    trace_path = traces_dir / f"{'_'.join(map(str, puzzle))}.txt"
+                    trace_path.write_text(text)
+
+            for name in PUZZLE_GROUPS:
+                totals[name] += run_rewards[name]
+            print(
+                f"Run {run + 1}: "
+                + ", ".join(f"{name} {run_rewards[name]:.0f}/{group_counts[name]}" for name in PUZZLE_GROUPS)
+            )
+            empty_device_cache(DEVICE)
+    print(
+        "Total: "
+        + ", ".join(
+            f"{name} {totals[name]:.0f}/{group_counts[name] * RUNS_PER_PUZZLE}"
+            for name in PUZZLE_GROUPS
+        )
+    )
+    return puzzle_success_rate
 
 
 if __name__ == "__main__":
@@ -80,9 +130,10 @@ if __name__ == "__main__":
     Hero Train Checkpoint 1127: 109/137, New Inference Engine | 103/137, 105/137, 109/137 
     """
 
-    val_path = Path(__file__).resolve().parent / "data/val.jsonl"
-    CHECKPOINT = 1127
+    CHECKPOINT = 1135
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
     print(f"Evaluating checkpoint {CHECKPOINT}")
-    final_success_count, final_reward = eval(checkpoint_path, val_path)
-    print(f"Final checkpoint: success count {final_success_count}, reward {final_reward}")
+    puzzle_success_rate = eval(checkpoint_path, VAL_PATH)
+
+    success_count = sum(1 for success in puzzle_success_rate.values() if success > 0)
+    print(f"Success count: {success_count}")
