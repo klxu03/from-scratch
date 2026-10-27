@@ -239,9 +239,12 @@ class Actor:
                 refreshed_rows.append(index)
 
         remaining[:] = self._unfinished_rollouts()
+
         # phase 1 just keep stuff we are still actively decoding, phase 2 (continuous) then keep everything except finished trajectories and inject user tokens
-        if len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold:
-            print(f"[Prefill] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
+        phase_1_need_rebuild = len(remaining) > self.tail_threshold and len(rows_to_keep) <= self.batch.cohort_start_size * self.rebuild_threshold
+        transition_to_phase_2 = len(remaining) <= self.tail_threshold and len(remaining) != (len(rows_to_keep) + len(refreshed_rows))
+        if phase_1_need_rebuild or transition_to_phase_2:
+            print(f"[Prefill] {len(remaining)} rows")
             for row in rows_to_keep:
                 rollout_id = self.batch.rollout_ids[row]
                 rollout = self.rollout_manager(rollout_id).rollout(rollout_id)
@@ -250,11 +253,6 @@ class Actor:
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
-        if len(remaining) <= self.tail_threshold and len(remaining) != len(rows_to_keep):
-            print(f"[Prefill] {len(remaining)}. Now under {self.tail_threshold} threshold")
-            self.batch = None
-            return
-
         print(f"[Decode] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
         if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
@@ -280,7 +278,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     model = Qwen3_5ForCausalLM.from_pretrained("Qwen/Qwen3.5-0.8B", dtype=torch.bfloat16).to(device).eval()
     MAX_OUTPUT_TOKENS = 2048
-    actor = Actor(model, max_output_tokens=MAX_OUTPUT_TOKENS, tail_threshold=4)
+    actor = Actor(model, max_output_tokens=MAX_OUTPUT_TOKENS, tail_threshold=8, rebuild_threshold=0.5)
     puzzles = [[8, 3, 8, 3], [6, 6, 6, 6]]
     group_size = 8
     rollouts = actor.collect_rollouts(puzzles, group_size=group_size)
