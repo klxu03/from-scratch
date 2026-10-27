@@ -64,13 +64,13 @@ class Learner:
 
         for i, rollout in enumerate(rollout_group):
             print(f"This rollout has {len(rollout.turns)} turns")
-            token_ids = torch.cat([prompt_ids, *[turn.token_ids for turn in rollout.turns]], dim=1).to(self.model.device)
+            token_ids = torch.cat([prompt_ids, *[turn.token_ids.unsqueeze(0) for turn in rollout.turns]], dim=1).to(self.model.device)
             action_mask = torch.cat([
                 torch.zeros(prompt_ids.shape[1], dtype=torch.bool),
                 *[
                     torch.cat([
                         torch.zeros(turn.completion_start, dtype=torch.bool),
-                        torch.ones(turn.token_ids.shape[1] - turn.completion_start, dtype=torch.bool),
+                        torch.ones(turn.token_ids.numel() - turn.completion_start, dtype=torch.bool),
                     ])
                     for turn in rollout.turns
                 ],

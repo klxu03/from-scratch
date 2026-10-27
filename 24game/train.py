@@ -2,7 +2,7 @@ from pathlib import Path
 from transformers import Qwen3_5ForCausalLM
 import torch
 from tqdm import tqdm
-from continuous_actor import Actor
+from actor import Actor
 from learner import Learner
 from lora_linear import apply_lora
 import time
@@ -64,7 +64,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> tuple[int, float]:
     return success_count, cumulative_reward
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 5
+    BATCH_SIZE = 6
     HARD_PER_BATCH = 3
     GROUP_SIZE = 24
 
@@ -148,7 +148,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
                 f.write(f"{avg_reward:.6g}\n")
 
             for puzzle, group in zip(training_batch, rollouts):
-                print(f"update_step {update_step + 1} | Puzzle: {sorted(puzzle)} had {sum(r.reward for r in group)} successes and generated {sum(turn.token_ids.shape[-1] - turn.completion_start for rollout in group for turn in rollout.turns)} tokens")
+                print(f"update_step {update_step + 1} | Puzzle: {sorted(puzzle)} had {sum(r.reward for r in group)} successes and generated {sum(turn.token_ids.numel() - turn.completion_start for rollout in group for turn in rollout.turns)} tokens")
 
             if model.device.type == "cuda":
                 torch.cuda.synchronize(model.device)
