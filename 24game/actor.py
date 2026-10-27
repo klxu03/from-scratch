@@ -4,7 +4,7 @@ from transformers import DynamicCache
 from transformers import AutoTokenizer, Qwen3_5ForCausalLM, LogitsProcessor, LogitsProcessorList, StoppingCriteria, StoppingCriteriaList
 from dataclasses import dataclass
 import time
-from env import calculator, verify_solution, execute_tools
+from env import calculator, verify_solution, execute_tools, tool_response
 
 import sys
 from pathlib import Path
@@ -229,7 +229,7 @@ class Actor:
                 rollout.reward = 1
                 continue
 
-            next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, tool_results)
+            next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, tool_response(tool_results, self.rollout_manager(rollout_id).puzzle))
             next_prompt_ids = self.tokenizer(next_prompt, add_special_tokens=False, return_tensors="pt")["input_ids"].squeeze(0)
 
             if real_length + next_prompt_ids.numel() >= self.max_output_tokens:

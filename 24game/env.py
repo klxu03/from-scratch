@@ -42,12 +42,7 @@ def calculator(expression: str) -> str:
 
     return str(evaluate(tree.body))
 
-def verify_solution(expression: str, puzzle: list[int]) -> bool:
-    parts = expression.split(" = ")
-    if len(parts) != 2:
-        return False
-    expression, result = parts
-
+def numbers_used(expression: str) -> list[int]:
     tree = ast.parse(expression, mode="eval")
 
     if any(
@@ -62,8 +57,20 @@ def verify_solution(expression: str, puzzle: list[int]) -> bool:
         if isinstance(node, ast.Constant) and type(node.value) is int
     ]
 
+    return numbers_used
+
+def verify_solution(expression: str, puzzle: list[int]) -> bool:
+    parts = expression.split(" = ")
+    if len(parts) != 2:
+        return False
+    expression, result = parts
+
+    nums_used = numbers_used(expression)
+    if nums_used is False:
+        return False
+
     # return used all numbers and expression evaluates to 24
-    return result == "24" and Counter(numbers_used) == Counter(puzzle) 
+    return result == "24" and Counter(nums_used) == Counter(puzzle) 
 
 def execute_tools(text: str, puzzle: list[int]) -> list[str]:
     matches = re.findall(
@@ -85,3 +92,17 @@ def execute_tools(text: str, puzzle: list[int]) -> list[str]:
         print(f"Calculator {expression} = {result}")
         ret.append(f"{expression} = {result}")
     return ret
+
+def tool_response(tool_results: list[str], puzzle: list[int]) -> list[str]:
+    responses = []
+    for result in tool_results:
+        expression, _, value = result.partition(" = ")
+        used = numbers_used(expression)
+        used_text = "invalid (every literal must be an integer)" if used is False else str(used)
+        responses.append(
+            f"{result}\n"
+            f"Expression result: {value}\n"
+            f"Numbers used: {used_text}\n"
+            f"Use only the puzzle numbers, each exactly once: {puzzle}"
+        )
+    return responses

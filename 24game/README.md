@@ -32,6 +32,7 @@ On CUDA:
 ```bash
 uv run --locked --extra cuda python 24game/train.py
 PYTORCH_ALLOC_CONF=expandable_segments:True nohup uv run --locked --extra cuda python -u 24game/train.py > run.run 2>&1 &
+PYTORCH_ALLOC_CONF=expandable_segments:True nohup uv run --locked --extra cuda python -u 24game/eval.py > eval.run 2>&1 &
 ```
 
 On Mac:

@@ -56,17 +56,22 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         [7, 7, 4, 4],
         [8, 1, 12, 12],
         [3, 5, 12, 2],
-        [11, 11, 5, 1],
         [2, 10, 5, 5],
-        [6, 6, 3, 10],
         [11, 11, 9, 8],
         [5, 7, 2, 8],
-        [12, 8, 5, 12],
         [3, 7, 5, 3],
         [2, 11, 10, 2],
         [6, 3, 6, 11],
         [10, 11, 5, 7],
         [7, 3, 3, 8],
+        [13, 5, 5, 13],
+        [2, 7, 10, 2],
+        [5, 8, 8, 5],
+        [1, 13, 8, 9],
+        [3, 5, 3, 5],
+        [7, 12, 8, 8],
+        [8, 13, 8, 8],
+        [2, 12, 2, 11],
     ]
     avg_rewards = initial_avg_rewards
 
@@ -87,6 +92,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             leave=True,
             dynamic_ncols=True,
         ):
+            print("\n\n")
             training_batch = epoch_puzzles[start:start + BATCH_SIZE - HARD_PER_BATCH].copy()
             # force HARD_PER_BATCH hard puzzles at the end
             hard_start = update_step % len(hard_pool)
@@ -205,7 +211,7 @@ def log_memory(step: int, phase: str = "after_step", device: torch.device | None
     return row
 
 if __name__ == "__main__":
-    starting_checkpoint = 1135
+    starting_checkpoint = 1143
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]

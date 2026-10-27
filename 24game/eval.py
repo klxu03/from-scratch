@@ -107,6 +107,28 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
     )
     return puzzle_success_rate
 
+def solve(puzzle: list[int]) -> bool:
+    ATTEMPTS = 30
+    with torch.inference_mode():
+        rollouts = actor.collect_rollouts([puzzle], ATTEMPTS)[0]
+    success_count = sum(1 for rollout in rollouts if rollout.reward > 0)
+
+    if success_count == 0:
+        print(f"Unsuccessful in solving {puzzle}")
+        return False
+    
+    print(f"Successfully solved {puzzle} {success_count} times")
+    
+    for rollout in rollouts:
+        if rollout.reward > 0:
+            history = torch.cat([
+                actor.rollout_managers[0].prompt_ids,
+                *(turn.token_ids for turn in rollout.turns),
+            ])
+            text = actor.tokenizer.decode(history, skip_special_tokens=False)
+            trace_path = traces_dir / f"{'_'.join(map(str, puzzle))}.txt"
+            trace_path.write_text(text)
+            return True
 
 if __name__ == "__main__":
     """
@@ -138,8 +160,34 @@ if __name__ == "__main__":
 
     """
     New Eval Scripts
+    Checkpoint 1066:
+    Run 1: easy 96/115, medium 15/20, hard 0/2
+    Run 2: easy 96/115, medium 17/20, hard 1/2
+    Run 3: easy 99/115, medium 14/20, hard 1/2
+    Run 4: easy 98/115, medium 18/20, hard 0/2
+    Success count: 133
+
+    Checkpoint 1135:
+    Run 1: easy 95/115, medium 17/20, hard 1/2 did (tuple) instead of [list] for puzzle
+    Run 1: easy 90/115, medium 15/20, hard 0/2
+    Run 2: easy 94/115, medium 15/20, hard 1/2
+    Run 3: easy 93/115, medium 17/20, hard 1/2
+    Run 4: easy 89/115, medium 14/20, hard 2/2
+    Success count: 130
+
+    Checkpoint 1210:
+    Run 1: easy 90/115, medium 14/20, hard 1/2
+    Run 2: easy 100/115, medium 17/20, hard 1/2
+    Run 3: easy 90/115, medium 16/20, hard 0/2
+    Run 4: easy 96/115, medium 14/20, hard 0/2
+    Total: easy 376/460, medium 61/80, hard 2/8
+    
+    With (tuple) instead of [list] for puzzle
+    Run 1: easy 90/115, medium 15/20, hard 1/2
+    Run 2: easy 94/115, medium 17/20, hard 0/2
     """
 
+    """
     CHECKPOINT = 1135
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
     print(f"Evaluating checkpoint {CHECKPOINT}")
@@ -147,3 +195,6 @@ if __name__ == "__main__":
 
     success_count = sum(1 for success in puzzle_success_rate.values() if success > 0)
     print(f"Success count: {success_count}")
+    """
+
+    solve([10, 4, 10, 2])
