@@ -250,6 +250,11 @@ class Actor:
             return
 
         rows_to_keep = rows_to_keep if len(remaining) > self.tail_threshold else sorted(rows_to_keep + refreshed_rows)
+        if len(remaining) <= self.tail_threshold and len(remaining) != len(rows_to_keep):
+            print(f"[Prefill] {len(remaining)}. Now under {self.tail_threshold} threshold")
+            self.batch = None
+            return
+
         print(f"[Decode] {len(rows_to_keep)} active | {len(remaining) - len(rows_to_keep)} waiting")
         if len(rows_to_keep) < len(self.batch.rollout_ids):
             self._evict_batch(rows_to_keep)
