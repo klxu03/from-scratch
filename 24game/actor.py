@@ -67,6 +67,17 @@ def continuation_suffix(tokenizer: AutoTokenizer, prefix_ids: torch.Tensor, tool
     return close + tools + "<|im_start|>assistant\n<think>\n"
 
 class Actor:
+    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = 24, rebuild_threshold: float = 0.25):
+        self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
+        self.eos_id = int(self.tokenizer.eos_token_id)
+        self.pad_id = self.tokenizer.pad_token_id
+        self.tail_threshold = tail_threshold
+        self.injector = LogitsProcessorList([self.Injector(self)])
+        self.stopper = StoppingCriteriaList([self.Stopper(self)])
+        self.rebuild_threshold = rebuild_threshold
+
     def get_next_injected_token_index(self, rollout_id: int, tokens_produced: int) -> int:
         """
         Calculates the index of the next token to inject from the back. 1 means access[-1] so last token
@@ -108,17 +119,6 @@ class Actor:
             generated_beyond_queued_prefix = generated_beyond_queued_prefix.to(self.actor.model.device)
             eligible_eos = sampled_eos & generated_beyond_queued_prefix
             return eligible_eos.any().expand(input_ids.shape[0])
-
-    def __init__(self, model: Qwen3_5ForCausalLM, max_output_tokens: int = 4096, tail_threshold: int = 24, rebuild_threshold: float = 0.25):
-        self.model = model
-        self.max_output_tokens = max_output_tokens
-        self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-0.8B")
-        self.eos_id = int(self.tokenizer.eos_token_id)
-        self.pad_id = self.tokenizer.pad_token_id
-        self.tail_threshold = tail_threshold
-        self.injector = LogitsProcessorList([self.Injector(self)])
-        self.stopper = StoppingCriteriaList([self.Stopper(self)])
-        self.rebuild_threshold = rebuild_threshold
 
     def _initialize(self, puzzles: list[list[int]]) -> None:
         self.rollout_managers: list[RolloutManager] = []
