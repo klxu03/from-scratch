@@ -257,6 +257,13 @@ if __name__ == "__main__":
     Success count: 133
 
     Run 1: easy 92/115, medium 17/20, hard 1/2
+    ** Started randomly shuffling puzzles within each training and evaluation batch
+
+    Run 1: easy 96/115, medium 16/20, hard 2/2
+    Run 2: easy 98/115, medium 18/20, hard 2/2
+    Run 3: easy 95/115, medium 18/20, hard 2/2
+    Run 4: easy 91/115, medium 18/20, hard 1/2
+    Unsolved after 4 runs: 7/137 [(10, 10, 2, 3), (10, 1, 8, 2), (3, 12, 6, 7), (8, 2, 9, 8), (6, 12, 12, 12), (12, 8, 5, 5), (4, 5, 6, 12)]
     """
 
     CHECKPOINT = 1373
