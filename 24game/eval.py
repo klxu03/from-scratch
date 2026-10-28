@@ -55,7 +55,7 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
     """
     if checkpoint_path is not None:
         learner.load_checkpoint(checkpoint_path)
-        print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
+        print(f"\nLoaded checkpoint from {checkpoint_path} for evaluation\n")
     model.eval()
 
     puzzles = []
@@ -248,6 +248,9 @@ if __name__ == "__main__":
     Checkpoint 1373:
     Run 1: easy 97/115, medium 16/20, hard 0/2
     Run 2: easy 94/115, medium 14/20, hard 1/2
+    Run 3: easy 91/115, medium 16/20, hard 1/2
+    Run 4: easy 92/115, medium 18/20, hard 0/2
+    Success count: 133
     """
 
     CHECKPOINT = 1373

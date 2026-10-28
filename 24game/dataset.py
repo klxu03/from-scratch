@@ -69,8 +69,6 @@ def uses_fraction(expr: str) -> bool:
 
 def generate_dataset():
     puzzles = sorted(combinations_with_replacement(range(1, 14), 4))
-    rng.shuffle(puzzles)
-    puzzles = [rng.sample(puzzle, len(puzzle)) for puzzle in puzzles]
 
     easy = [] # remaining
     medium = [] # only one answer
