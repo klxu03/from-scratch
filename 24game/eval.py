@@ -198,17 +198,27 @@ if __name__ == "__main__":
     Total: easy 366/460, medium 62/80, hard 2/8
     Success count: 127
 
-    Env now provides missing/extra
+    Checkpoint 1280 and env now provides missing/extra:
+    Run 1: easy 92/115, medium 17/20, hard 1/2
+    Run 2: easy 98/115, medium 13/20, hard 0/2
+    Run 3: easy 96/115, medium 18/20, hard 0/2
+    Run 4: easy 99/115, medium 14/20, hard 2/2
+    Success count: 133
+
+    Baseline when env doesn't give any extra info (just result):
+    Run 1: easy 88/115, medium 16/20, hard 0/2
+    Run 2: easy 91/115, medium 14/20, hard 0/2
+    Run 3: easy 100/115, medium 13/20, hard 0/2
+    Run 4: easy 93/115, medium 17/20, hard 0/2
+    Success count: 130
     """
 
-    CHECKPOINT = 1210
+    CHECKPOINT = 1288
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
-    """
     print(f"Evaluating checkpoint {CHECKPOINT}")
     puzzle_success_rate = eval(checkpoint_path, VAL_PATH)
 
     success_count = sum(1 for success in puzzle_success_rate.values() if success > 0)
     print(f"Success count: {success_count}")
-    """
 
-    solve([10, 4, 10, 2], checkpoint_path)
+    # solve([10, 4, 10, 2], checkpoint_path)
