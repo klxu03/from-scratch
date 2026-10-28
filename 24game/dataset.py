@@ -25,10 +25,13 @@ OPERATORS = [
     (lambda left, right: ops.truediv(right, left), "r/"),
 ]
 
-def evaluate(terms: list[Term]) -> list[Term]:
+def evaluate(terms: list[Term] | list[int]) -> list[Term]:
     """
     Given an initial starting number and a list of next numbers, return a list of all possible results.
     """
+    if terms and isinstance(terms[0], int):
+        terms = [Term(Fraction(n), str(n)) for n in terms]
+
     results = []
 
     if len(terms) == 1 and terms[0].value == 24:

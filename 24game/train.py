@@ -7,11 +7,8 @@ from learner import Learner
 from lora_linear import apply_lora
 import time
 import numpy as np
-from graph import create_rolling
-
-import psutil
-import csv
-import time
+from utils.graph import create_rolling
+from utils.memory import empty_device_cache, log_memory, print_memory, reset_peak_memory
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 4096
@@ -76,7 +73,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     ]
     avg_rewards = initial_avg_rewards
 
-    log_memory(0, "initialized", model.device)
+    log_memory(0, "initialized", model.device, _MEMORY_CSV)
 
     update_step = initial_update_step
     # for epoch in range(EPOCHS):
@@ -107,16 +104,14 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
 
             start_time = time.time()
 
-            if model.device.type == "cuda":
-                torch.cuda.reset_peak_memory_stats(model.device)
-                retries_before = torch.cuda.memory_stats(model.device)["num_alloc_retries"]
+            retries_before = reset_peak_memory(model.device)
 
             rollouts = actor.collect_rollouts(training_batch, GROUP_SIZE)
             rollout_time = time.time()
             for i, rollout_group in enumerate(rollouts):
                 learner.accumulate_group(rollout_group, training_batch[i], GROUP_SIZE * len(training_batch))
             avg_reward = learner.step() / (GROUP_SIZE * len(training_batch))
-            log_memory(update_step + 1, device=model.device)
+            log_memory(update_step + 1, device=model.device, csv_path=_MEMORY_CSV)
             step_time = time.time()
             avg_rewards.append(avg_reward)
             with avg_reward_csv_path.open("a") as f:
@@ -125,19 +120,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             for puzzle, group in zip(training_batch, rollouts):
                 print(f"update_step {update_step + 1} | Puzzle: {sorted(puzzle)} had {sum(r.reward for r in group)} successes and generated {sum(turn.token_ids.numel() - turn.completion_start for rollout in group for turn in rollout.turns)} tokens")
 
-            if model.device.type == "cuda":
-                torch.cuda.synchronize(model.device)
-                memory_stats = torch.cuda.memory_stats(model.device)
-
-                print(
-                    f"Peak live: "
-                    f"{torch.cuda.max_memory_allocated(model.device) / 2**30:.2f} GiB | "
-                    f"Peak reserved: "
-                    f"{torch.cuda.max_memory_reserved(model.device) / 2**30:.2f} GiB | "
-                    f"Allocation retries this step: "
-                    f"{memory_stats['num_alloc_retries'] - retries_before}",
-                    flush=True,
-                )
+            print_memory(model.device, retries_before)
 
             print(f"Average reward: {avg_reward}")
             print(f"Rollouts time: {rollout_time - start_time}, Step time: {step_time - rollout_time}\n")
@@ -146,70 +129,9 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             create_rolling(rolling_avg_path, avg_rewards, [5, 20, 40], title="GRPO rolling average")
 
             empty_device_cache(model.device)
-            log_memory(update_step + 1, "after_empty_cache", model.device)
+            log_memory(update_step + 1, "after_empty_cache", model.device, _MEMORY_CSV)
 
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
-
-def empty_device_cache(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-    elif device.type == "mps":
-        torch.mps.empty_cache()
-
-def _device_memory(device: torch.device) -> tuple[int, int]:
-    """Bytes in live tensors, and bytes reserved from the driver by the caching allocator."""
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-        return torch.cuda.memory_allocated(device), torch.cuda.memory_reserved(device)
-    if device.type == "mps":
-        torch.mps.synchronize()
-        return torch.mps.current_allocated_memory(), torch.mps.driver_allocated_memory()
-    return 0, 0
-
-_PROCESS = psutil.Process()
-def log_memory(step: int, phase: str = "after_step", device: torch.device | None = None) -> dict:
-    """Record memory without clearing gradients, objects, or caches."""
-    if device is None:
-        device = model.device
-    live, reserved = _device_memory(device)
-
-    gib = 2**30
-    vm = psutil.virtual_memory()
-    swap = psutil.swap_memory()
-
-    sizes = {
-        "device": str(device),
-        "device_allocated_gib": live / gib,
-        "device_reserved_gib": reserved / gib,
-        "device_gap_gib": (reserved - live) / gib,
-        "process_rss_gib": _PROCESS.memory_info().rss / gib,
-        "system_total_gib": vm.total / gib,
-        "system_available_gib": vm.available / gib,
-        "system_swap_gib": swap.used / gib,
-        "disk_free_gib": psutil.disk_usage(_MEMORY_CSV.parent).free / gib,
-        "process_uss_gib": _PROCESS.memory_full_info().uss / gib,
-        "swap_in_gib": swap.sin / gib,
-        "swap_out_gib": swap.sout / gib,
-    }
-
-    row = {
-        "timestamp": time.time(),
-        "pid": _PROCESS.pid,
-        "step": step,
-        "phase": phase,
-        **sizes,
-    }
-
-    needs_header = (
-        not _MEMORY_CSV.exists() or _MEMORY_CSV.stat().st_size == 0
-    )
-    with _MEMORY_CSV.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(row))
-        if needs_header:
-            writer.writeheader()
-        writer.writerow(row)
-
-    return row
 
 if __name__ == "__main__":
     starting_checkpoint = 1288

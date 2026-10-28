@@ -3,14 +3,10 @@ from transformers import Qwen3_5ForCausalLM
 import torch
 from tqdm import tqdm
 from actor import Actor
+from dataset import evaluate
 from learner import Learner
 from lora_linear import apply_lora
-
-def empty_device_cache(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-    elif device.type == "mps":
-        torch.mps.empty_cache()
+from utils.memory import empty_device_cache
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 4096
@@ -54,6 +50,9 @@ traces_dir = Path(__file__).resolve().parent / "traces"
 traces_dir.mkdir(parents=True, exist_ok=True)
 
 def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...], float]:
+    """
+    Runs our evaluation on on the data_path of puzzles, returns a dictionary of puzzle -> cumulative reward
+    """
     if checkpoint_path is not None:
         learner.load_checkpoint(checkpoint_path)
         print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
@@ -97,6 +96,10 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
                 f"Run {run + 1}: "
                 + ", ".join(f"{name} {run_rewards[name]:.0f}/{group_counts[name]}" for name in PUZZLE_GROUPS)
             )
+
+            num_puzzles_with_no_solves = sum(success == 0 for success in puzzle_success_rate.values())
+            print(f"Unsolved after {run + 1} runs: {num_puzzles_with_no_solves}/{len(puzzles)}")
+
             empty_device_cache(DEVICE)
     print(
         "Total: "
@@ -108,12 +111,16 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
     return puzzle_success_rate
 
 def solve(puzzle: list[int], checkpoint_path: Path | None = None) -> bool:
+    if not evaluate(puzzle):
+        print(f"No solution for {puzzle}")
+        return False
+
     if checkpoint_path is not None:
         learner.load_checkpoint(checkpoint_path)
         print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
 
     model.eval()
-    ATTEMPTS = 30
+    ATTEMPTS = 20
     with torch.inference_mode():
         rollouts = actor.collect_rollouts([puzzle], ATTEMPTS)[0]
     success_count = sum(1 for rollout in rollouts if rollout.reward > 0)
@@ -134,6 +141,32 @@ def solve(puzzle: list[int], checkpoint_path: Path | None = None) -> bool:
             trace_path = traces_dir / f"{'_'.join(map(str, puzzle))}.txt"
             trace_path.write_text(text)
             return True
+
+def ask(prompt: str, checkpoint_path: Path | None = None) -> None:
+    if checkpoint_path is not None:
+        learner.load_checkpoint(checkpoint_path)
+        print(f"Loaded checkpoint from {checkpoint_path} for evaluation")
+
+    with torch.inference_mode():
+        input_ids = actor.tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=True,
+            add_generation_prompt=True,
+            enable_thinking=True,
+            return_dict=True,
+            return_tensors="pt",
+        )["input_ids"].to(model.device)
+        output_ids = model.generate(
+            input_ids=input_ids,
+            max_new_tokens=2048,
+            do_sample=False,
+            temperature=0.0,
+            top_p=1.0,
+            top_k=0,
+            use_cache=True,
+        )
+        text = actor.tokenizer.decode(output_ids[0, input_ids.shape[1]:], skip_special_tokens=True)
+        print(text)
 
 if __name__ == "__main__":
     """
@@ -211,14 +244,23 @@ if __name__ == "__main__":
     Run 3: easy 100/115, medium 13/20, hard 0/2
     Run 4: easy 93/115, medium 17/20, hard 0/2
     Success count: 130
+
+    Checkpoint 1373:
+    Run 1: easy 97/115, medium 16/20, hard 0/2
+    Run 2: easy 94/115, medium 14/20, hard 1/2
     """
 
-    CHECKPOINT = 1288
+    CHECKPOINT = 1373
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
+
     print(f"Evaluating checkpoint {CHECKPOINT}")
     puzzle_success_rate = eval(checkpoint_path, VAL_PATH)
 
     success_count = sum(1 for success in puzzle_success_rate.values() if success > 0)
     print(f"Success count: {success_count}")
 
-    # solve([10, 4, 10, 2], checkpoint_path)
+    for puzzle, success in puzzle_success_rate.items():
+        if success == 0:
+            print(f"Puzzle {puzzle} failed")
+
+    # solve([8, 1, 5, 4], checkpoint_path)

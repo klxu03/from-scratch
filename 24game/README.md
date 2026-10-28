@@ -57,6 +57,14 @@ Each puzzle is four integers. The model is given a fixed input found in `utils/p
 ```
 
 Every match in the response is executed. Quotes around the expression are stripped. The calculator parses the expression and evaluates it with exact fractions, so division does not become a float. It allows integer and float literals, `+`, `-`, `*`, `/`, parentheses, and unary plus and minus. 
-Each accepted call comes back as a string such as `(8 * 3) * (3 - 1) = 48`, wrapped in a `<tool_response>` and shown to the model on the next turn.
+Each accepted call is wrapped in a `<tool_response>` and shown to the model on the next turn. The response includes the calculator result and the numbers used. The expression has to use all four puzzle numbers exactly once, so when it does not, the response also lists the missing and extra digits:
 
-I treat that decoded text from this turn as a success when any of those result strings passes verification. Passing verification means the calculator result is `24`, every literal in the expression is an integer, and those integers are exactly the puzzle numbers, each used once.
+```
+Calculator result: 48
+Numbers used: [8, 3, 3, 1]
+Invalid card usage.
+Missing: [8]
+Extra: [1]
+```
+
+I treat that call as a success when the calculator result is `24`, every literal in the expression is an integer, and those integers are exactly the puzzle numbers, each used once.
