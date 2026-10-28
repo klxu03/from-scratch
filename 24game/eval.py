@@ -101,8 +101,8 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
                 + ", ".join(f"{name} {run_rewards[name]:.0f}/{group_counts[name]}" for name in PUZZLE_GROUPS)
             )
 
-            num_puzzles_with_no_solves = sum(success == 0 for success in puzzle_success_rate.values())
-            print(f"Unsolved after {run + 1} runs: {num_puzzles_with_no_solves}/{len(puzzles)}")
+            unsolved = [key for key, success in puzzle_success_rate.items() if success == 0]
+            print(f"Unsolved after {run + 1} runs: {len(unsolved)}/{len(puzzles)} {unsolved}")
 
             empty_device_cache(DEVICE)
     print(
@@ -255,6 +255,8 @@ if __name__ == "__main__":
     Run 3: easy 91/115, medium 16/20, hard 1/2
     Run 4: easy 92/115, medium 18/20, hard 0/2
     Success count: 133
+
+    Run 1: easy 92/115, medium 17/20, hard 1/2
     """
 
     CHECKPOINT = 1373
