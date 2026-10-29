@@ -29,28 +29,31 @@ HARD_PUZZLES = Path(__file__).resolve().parent / "data/hard.jsonl"
 PUZZLE_GROUPS = ("easy", "medium", "hard")
 
 VAL_PATH = Path(__file__).resolve().parent / "data/val.jsonl"
+TEST_PATH = Path(__file__).resolve().parent / "data/test.jsonl"
 
 def load_puzzle_groups() -> dict[tuple[int, ...], str]:
     groups = {}
-    val_set = {
-        tuple(int(n) for n in line.split())
-        for line in VAL_PATH.read_text().splitlines()
-        if line.strip()
-    }
     for name, path in zip(PUZZLE_GROUPS, (EASY_PUZZLES, MEDIUM_PUZZLES, HARD_PUZZLES)):
         for line in path.read_text().splitlines():
             if line.strip():
-                puzzle = tuple(int(n) for n in line.split())
-                if puzzle in val_set:
-                    groups[puzzle] = name
+                groups[tuple(int(n) for n in line.split())] = name
     return groups
 
+def load_puzzle_splits() -> dict[tuple[int, ...], str]:
+    splits = {}
+    for name, path in (("val", VAL_PATH), ("test", TEST_PATH)):
+        for line in path.read_text().splitlines():
+            if line.strip():
+                splits[tuple(int(n) for n in line.split())] = name
+    return splits
+
 puzzle_groups = load_puzzle_groups()
+puzzle_splits = load_puzzle_splits()
 
 traces_dir = Path(__file__).resolve().parent / "traces"
 traces_dir.mkdir(parents=True, exist_ok=True)
 
-def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...], float]:
+def eval(checkpoint_path: Path | None, data_path: Path | None = None, runs_per_puzzle: int = 8) -> dict[tuple[int, ...], float]:
     """
     Runs our evaluation on on the data_path of puzzles, returns a dictionary of puzzle -> cumulative reward
     """
@@ -61,13 +64,17 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
 
     puzzles = []
     puzzle_keys = []
-    for line in Path(data_path).read_text().splitlines():
-        if line.strip():
-            puzzle = [int(n) for n in line.split()]
-            puzzle_keys.append(tuple(puzzle))
-            puzzles.append(puzzle)
 
-    RUNS_PER_PUZZLE = 8
+    data_paths = [VAL_PATH, TEST_PATH] if data_path is None else [data_path]
+
+    for data_path in data_paths:
+        for line in Path(data_path).read_text().splitlines():
+            if line.strip():
+                puzzle = [int(n) for n in line.split()]
+                puzzle_keys.append(tuple(puzzle))
+                puzzles.append(puzzle)
+
+    RUNS_PER_PUZZLE = runs_per_puzzle
     group_counts = {name: 0 for name in PUZZLE_GROUPS}
     puzzle_success_rate: dict[tuple[int, ...], float] = {}
     for key in puzzle_keys:
@@ -258,7 +265,7 @@ if __name__ == "__main__":
     Success count: 133
 
     Run 1: easy 92/115, medium 17/20, hard 1/2
-    ** Started randomly shuffling puzzles within each training and evaluation batch
+    ** Started randomly shuffling puzzles within each training and evaluation batch. And sorted puzzles (validation contamination)
 
     Run 1: easy 96/115, medium 16/20, hard 2/2
     Run 2: easy 98/115, medium 18/20, hard 2/2
@@ -290,19 +297,53 @@ if __name__ == "__main__":
     Run 7: easy 95/115, medium 19/20, hard 1/2
     Unsolved after 7 runs: 0/137 []
     Run 8: easy 99/115, medium 16/20, hard 2/2
+
+    Checkpoint 1471:
+    ** 1 hard, 2 medium, 4 random train split. Validation set back to original validation (not in training)
+    Run 1: easy 90/115, medium 16/20, hard 1/2
+    Run 2: easy 86/115, medium 17/20, hard 1/2
+    Run 3: easy 92/115, medium 17/20, hard 1/2
+    Run 4: easy 90/115, medium 19/20, hard 1/2
+    Run 5: easy 92/115, medium 16/20, hard 1/2
+    Unsolved after 5 runs: 5/137 [(1, 3, 7, 8), (2, 2, 7, 12), (2, 3, 10, 10), (5, 5, 8, 12), (5, 7, 10, 10)]
+    Run 6: easy 87/115, medium 17/20, hard 2/2
+    Unsolved after 6 runs: 2/137 [(2, 3, 10, 10), (5, 5, 8, 12)]
+    Run 7: easy 93/115, medium 18/20, hard 2/2
+    Run 8: easy 92/115, medium 14/20, hard 1/2
+    Unsolved after 8 runs: 2/137 [(2, 3, 10, 10), (5, 5, 8, 12)]
+
+    Checkpoint 1066:
+    Run 1: easy 99/115, medium 14/20, hard 0/2
+    Run 2: easy 98/115, medium 16/20, hard 1/2
+    Run 3: easy 93/115, medium 16/20, hard 0/2
+    Unsolved after 3 runs: 6/137 [(10, 10, 2, 3), (2, 7, 12, 4), (8, 1, 8, 10), (13, 8, 7, 8), (3, 3, 13, 7), (2, 11, 11, 2)]
+    Run 4: easy 93/115, medium 16/20, hard 1/2
+    Run 5: easy 99/115, medium 16/20, hard 2/2
+    Unsolved after 5 runs: 4/137 [(10, 10, 2, 3), (8, 1, 8, 10), (13, 8, 7, 8), (3, 3, 13, 7)]
+    Run 6: easy 98/115, medium 17/20, hard 2/2
+    Unsolved after 6 runs: 3/137 [(10, 10, 2, 3), (13, 8, 7, 8), (3, 3, 13, 7)]
+    Run 7: easy 100/115, medium 16/20, hard 1/2
+    Run 8: easy 102/115, medium 16/20, hard 1/2
+    Unsolved after 8 runs: 1/137 [(3, 3, 13, 7)]
     """
 
-    CHECKPOINT = 1471
+    CHECKPOINT = 1066
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
-    puzzle_success_rate = eval(checkpoint_path, VAL_PATH)
+    RUNS_PER_PUZZLE = 16
+    puzzle_success_rate = eval(checkpoint_path, runs_per_puzzle=16)
 
     success_count = sum(1 for success in puzzle_success_rate.values() if success > 0)
     print(f"Success count: {success_count}")
 
     for puzzle, success in puzzle_success_rate.items():
-        if success == 0:
-            print(f"Puzzle {puzzle} failed")
+        if success <= RUNS_PER_PUZZLE // 2:
+            print(f"Puzzle {puzzle} ({puzzle_splits[puzzle]}) succeeded {success} times")
+
+    sorted_puzzles = sorted(puzzle_success_rate.items(), key=lambda x: x[1])
+    print("30 puzzles with the lowest success rates:")
+    for puzzle, success in sorted_puzzles[:30]:
+        print(f"Puzzle {puzzle} ({puzzle_splits[puzzle]}) succeeded {success} times")
 
     # solve([8, 1, 5, 4], checkpoint_path)

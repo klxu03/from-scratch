@@ -30,6 +30,23 @@ def print_memory(device: torch.device, retries_before: int | None = None) -> Non
         flush=True,
     )
 
+def print_peak_memory(device: torch.device, label: str) -> None:
+    """Print the CUDA peak since the last reset, then start a new peak window."""
+    if device.type != "cuda":
+        return
+    torch.cuda.synchronize(device)
+    print(
+        f"{label} peak allocated:",
+        torch.cuda.max_memory_allocated(device) / 2**30,
+        "GiB",
+    )
+    print(
+        f"{label} peak reserved:",
+        torch.cuda.max_memory_reserved(device) / 2**30,
+        "GiB",
+    )
+    torch.cuda.reset_peak_memory_stats(device)
+
 def empty_device_cache(device: torch.device) -> None:
     if device.type == "cuda":
         torch.cuda.empty_cache()

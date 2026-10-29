@@ -144,4 +144,4 @@ def sort_puzzles():
 if __name__ == "__main__":
     generate_dataset()
     split_dataset()
-    # sort_puzzles()
+    sort_puzzles()
