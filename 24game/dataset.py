@@ -69,6 +69,8 @@ def uses_fraction(expr: str) -> bool:
 
 def generate_dataset():
     puzzles = sorted(combinations_with_replacement(range(1, 14), 4))
+    rng.shuffle(puzzles)
+    puzzles = [rng.sample(puzzle, len(puzzle)) for puzzle in puzzles]
 
     easy = [] # remaining
     medium = [] # only one answer
@@ -125,6 +127,21 @@ def split_dataset():
                 for puzzle in puzzles:
                     f.write(" ".join(map(str, puzzle)) + "\n")
 
+def sort_puzzles():
+    data_dir = Path(__file__).resolve().parent / "data"
+    for name in ["train", "val", "test", "easy", "medium", "hard"]:
+        path = data_dir / f"{name}.jsonl"
+        puzzles = [
+            sorted(int(n) for n in line.split())
+            for line in path.read_text().splitlines()
+            if line.strip()
+        ]
+        puzzles.sort()
+        with open(data_dir / f"{name}.jsonl", "w") as f:
+            for puzzle in puzzles:
+                f.write(" ".join(map(str, puzzle)) + "\n")
+
 if __name__ == "__main__":
     generate_dataset()
     split_dataset()
+    # sort_puzzles()

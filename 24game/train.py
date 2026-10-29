@@ -9,6 +9,7 @@ import time
 import numpy as np
 from utils.graph import create_rolling
 from utils.memory import empty_device_cache, log_memory, print_memory, reset_peak_memory
+import random
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 4096
@@ -31,8 +32,8 @@ rolling_avg_path = Path(__file__).resolve().with_name("rolling_avg.jpg")
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 6
-    HARD_PER_BATCH = 2
+    BATCH_SIZE = 7
+    MEDIUM_PER_BATCH = 2
     GROUP_SIZE = 24
 
     if checkpoint_path is not None:
@@ -45,32 +46,29 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         if line.strip():
             train_data.append(list(map(int, line.split()))) 
 
-    # train_data = [[6, 6, 6, 6]] * 150 
     medium_hard_puzzles = train_data[-170:]
     hard_pool = [
         [1, 2, 11, 12],
-        [1, 8, 9, 13],
-        [1, 8, 12, 12],
-        [2, 2, 7, 10],
+        [1, 9, 10, 13],
         [2, 2, 10, 11],
-        [2, 2, 11, 12],
         [2, 3, 5, 12],
+        [2, 4, 5, 5],
+        [2, 4, 10, 10],
         [2, 5, 5, 10],
         [2, 5, 7, 8],
-        [3, 3, 5, 5],
-        [3, 3, 5, 7],
-        [3, 3, 7, 8],
-        [3, 3, 8, 8],
+        [2, 5, 8, 10],
+        [3, 5, 6, 13],
         [3, 5, 7, 13],
         [3, 5, 8, 12],
-        [3, 6, 6, 11],
-        [4, 4, 7, 7],
+        [3, 8, 12, 13],
         [4, 5, 6, 13],
+        [4, 7, 11, 12],
+        [4, 8, 8, 9],
         [4, 8, 8, 11],
-        [5, 5, 13, 13],
-        [5, 7, 10, 11],
+        [4, 8, 9, 10],
         [6, 7, 8, 12],
         [7, 8, 8, 12],
+        [7, 10, 10, 12],
         [8, 8, 8, 13],
         [8, 9, 11, 11],
     ]
@@ -83,25 +81,18 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        random_indices = np.random.choice(len(train_data), size=40, replace=False)
-        epoch_puzzles = medium_hard_puzzles + [train_data[i] for i in random_indices]
-        np.random.shuffle(epoch_puzzles)
+        np.random.shuffle(medium_hard_puzzles)
         for start in tqdm(
-            range(0, len(epoch_puzzles), BATCH_SIZE - HARD_PER_BATCH),
+            range(0, len(medium_hard_puzzles), MEDIUM_PER_BATCH),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
         ):
             print("\n\n")
-            training_batch = [puzzle.copy() for puzzle in epoch_puzzles[start:start + BATCH_SIZE - HARD_PER_BATCH]]
-            # force HARD_PER_BATCH hard puzzles at the end
-            hard_start = update_step % len(hard_pool)
-
-            training_batch.extend(
-                hard_pool[(hard_start + i) % len(hard_pool)].copy()
-                for i in range(HARD_PER_BATCH)
-            )
+            training_batch = [puzzle.copy() for puzzle in medium_hard_puzzles[start:start + MEDIUM_PER_BATCH]]
+            training_batch.extend([hard_pool[update_step % len(hard_pool)].copy()])
+            training_batch.extend(p.copy() for p in random.sample(train_data, 4))
 
             for puzzle in training_batch:
                 np.random.shuffle(puzzle)
@@ -140,7 +131,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
 if __name__ == "__main__":
-    starting_checkpoint = 1373
+    starting_checkpoint = 1386
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]

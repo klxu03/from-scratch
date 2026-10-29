@@ -65,10 +65,9 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
         if line.strip():
             puzzle = [int(n) for n in line.split()]
             puzzle_keys.append(tuple(puzzle))
-            random.shuffle(puzzle)
             puzzles.append(puzzle)
 
-    RUNS_PER_PUZZLE = 4
+    RUNS_PER_PUZZLE = 8
     group_counts = {name: 0 for name in PUZZLE_GROUPS}
     puzzle_success_rate: dict[tuple[int, ...], float] = {}
     for key in puzzle_keys:
@@ -78,6 +77,8 @@ def eval(checkpoint_path: Path | None, data_path: Path) -> dict[tuple[int, ...],
 
     with torch.inference_mode():
         for run in tqdm(range(RUNS_PER_PUZZLE), desc="Evaluating"):
+            for puzzle in puzzles:
+                random.shuffle(puzzle)
             rollouts = actor.collect_rollouts(puzzles, 1)
             run_rewards = {name: 0.0 for name in PUZZLE_GROUPS}
             for index, (key, group) in enumerate(zip(puzzle_keys, rollouts)):
@@ -264,9 +265,34 @@ if __name__ == "__main__":
     Run 3: easy 95/115, medium 18/20, hard 2/2
     Run 4: easy 91/115, medium 18/20, hard 1/2
     Unsolved after 4 runs: 7/137 [(10, 10, 2, 3), (10, 1, 8, 2), (3, 12, 6, 7), (8, 2, 9, 8), (6, 12, 12, 12), (12, 8, 5, 5), (4, 5, 6, 12)]
+
+    Checkpoint 1454:
+    Run 1: easy 90/115, medium 17/20, hard 1/2
+    Run 2: easy 94/115, medium 14/20, hard 0/2
+    Run 3: easy 95/115, medium 18/20, hard 1/2
+    Unsolved after 3 runs: 7/137 [(4, 9, 10, 12), (5, 6, 8, 9), (2, 6, 12, 13), (3, 6, 7, 10), (1, 3, 13, 13), (3, 8, 9, 12), (1, 9, 11, 12)]
+    Run 4: easy 100/115, medium 14/20, hard 0/2
+    Unsolved after 4 runs: 2/137 [(4, 9, 10, 12), (3, 6, 7, 10)]
+    Run 5: easy 100/115, medium 17/20, hard 1/2
+    Run 6: easy 89/115, medium 15/20, hard 0/2
+    Run 7: easy 87/115, medium 15/20, hard 0/2
+    Run 8: easy 92/115, medium 15/20, hard 1/2
+    Unsolved after 8 runs: 1/137 [(3, 6, 7, 10)]
+
+    Run 1: easy 92/115, medium 16/20, hard 1/2
+    Run 2: easy 96/115, medium 15/20, hard 0/2
+    Run 3: easy 93/115, medium 15/20, hard 0/2
+    Unsolved after 3 runs: 7/137 [(4, 10, 10, 12), (1, 5, 11, 12), (2, 3, 10, 10), (2, 2, 7, 12), (3, 6, 7, 10), (2, 2, 10, 13), (2, 4, 10, 10)]
+    Run 4: easy 94/115, medium 17/20, hard 1/2
+    Run 5: easy 88/115, medium 16/20, hard 1/2
+    Unsolved after 5 runs: 2/137 [(2, 3, 10, 10), (3, 6, 7, 10)]
+    Run 6: easy 96/115, medium 18/20, hard 2/2
+    Run 7: easy 95/115, medium 19/20, hard 1/2
+    Unsolved after 7 runs: 0/137 []
+    Run 8: easy 99/115, medium 16/20, hard 2/2
     """
 
-    CHECKPOINT = 1373
+    CHECKPOINT = 1471
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
