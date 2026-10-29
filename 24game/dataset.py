@@ -136,7 +136,6 @@ def sort_puzzles():
             for line in path.read_text().splitlines()
             if line.strip()
         ]
-        puzzles.sort()
         with open(data_dir / f"{name}.jsonl", "w") as f:
             for puzzle in puzzles:
                 f.write(" ".join(map(str, puzzle)) + "\n")

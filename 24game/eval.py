@@ -325,6 +325,15 @@ if __name__ == "__main__":
     Run 7: easy 100/115, medium 16/20, hard 1/2
     Run 8: easy 102/115, medium 16/20, hard 1/2
     Unsolved after 8 runs: 1/137 [(3, 3, 13, 7)]
+
+    Eval on on val + test results
+    Checkpoint 1066:
+    Run 1: easy 188/230, medium 33/40, hard 0/4
+    Run 2: easy 189/230, medium 35/40, hard 1/4
+    Run 3: easy 189/230, medium 31/40, hard 2/4
+    Unsolved after 3 runs: 9/274 [(2, 2, 11, 11), (5, 5, 8, 12), (6, 12, 12, 12), (7, 8, 8, 13), (3, 12, 12, 13), (5, 8, 10, 12), (6, 9, 9, 10), (6, 11, 12, 12), (8, 9, 9, 12)]
+    Run 4: easy 198/230, medium 32/40, hard 1/4
+    Unsolved after 4 runs: 6/274 [(2, 2, 11, 11), (5, 5, 8, 12), (6, 12, 12, 12), (7, 8, 8, 13), (3, 12, 12, 13), (6, 9, 9, 10)]
     """
 
     CHECKPOINT = 1066

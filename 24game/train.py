@@ -56,20 +56,19 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         [2, 4, 10, 10],
         [2, 5, 5, 10],
         [2, 5, 7, 8],
-        [2, 5, 8, 10],
+        [3, 4, 7, 8],
         [3, 5, 6, 13],
         [3, 5, 7, 13],
         [3, 5, 8, 12],
-        [3, 8, 12, 13],
         [4, 5, 6, 13],
+        [4, 6, 6, 10],
         [4, 7, 11, 12],
         [4, 8, 8, 9],
         [4, 8, 8, 11],
-        [4, 8, 9, 10],
         [6, 7, 8, 12],
         [7, 8, 8, 12],
         [7, 10, 10, 12],
-        [8, 8, 8, 13],
+        [8, 9, 10, 12],
         [8, 9, 11, 11],
     ]
     avg_rewards = initial_avg_rewards
@@ -132,7 +131,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
 if __name__ == "__main__":
-    starting_checkpoint = 1472
+    starting_checkpoint = 1557
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
