@@ -46,28 +46,18 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             train_data.append(list(map(int, line.split()))) 
 
     hard_pool = [
-        [1, 2, 11, 12],
-        [1, 9, 10, 13],
-        [2, 2, 10, 11],
-        [2, 3, 5, 12],
-        [2, 4, 5, 5],
-        [2, 4, 10, 10],
-        [2, 5, 5, 10],
-        [2, 5, 7, 8],
-        [3, 4, 7, 8],
-        [3, 5, 6, 13],
-        [3, 5, 7, 13],
-        [3, 5, 8, 12],
-        [4, 5, 6, 13],
-        [4, 6, 6, 10],
-        [4, 7, 11, 12],
-        [4, 8, 8, 9],
-        [4, 8, 8, 11],
-        [6, 7, 8, 12],
-        [7, 8, 8, 12],
-        [7, 10, 10, 12],
-        [8, 9, 10, 12],
-        [8, 9, 11, 11],
+        [8, 9, 10, 12], [2, 5, 5, 10],
+        [1, 2, 11, 12], [2, 5, 7, 8],
+        [3, 4, 7, 8],   [3, 5, 8, 12],
+        [7, 10, 10, 12],[1, 4, 5, 6],
+        [4, 5, 6, 13],  [6, 7, 8, 12],
+        [2, 4, 10, 10], [2, 5, 8, 12],
+        [4, 8, 8, 9],   [3, 5, 7, 13],
+        [4, 6, 6, 10],  [3, 6, 6, 10],
+        [1, 9, 10, 13], [4, 7, 11, 12],
+        [8, 9, 11, 11], [2, 2, 10, 11],
+        [4, 8, 8, 11],  [1, 4, 7, 11],
+        [7, 8, 8, 12],  [2, 3, 5, 12],
     ]
     avg_rewards = initial_avg_rewards
 
@@ -81,7 +71,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         np.random.shuffle(train_data)
         train_per_batch = BATCH_SIZE - HARDS_PER_BATCH
         for start in tqdm(
-            range(0, len(train_data) - train_per_batch + 1, train_per_batch),
+            range(0, len(train_data), train_per_batch),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,

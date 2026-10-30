@@ -400,6 +400,8 @@ if __name__ == "__main__":
     Run 14: easy 203/230, medium 31/40, hard 2/4
     Run 15: easy 193/230, medium 29/40, hard 0/4
     Run 16: easy 205/230, medium 30/40, hard 2/4
+
+    ** Checkpoint 1722 changed data mixture to 10 epoch puzzles + 2 hards
     """
 
     CHECKPOINT = 1698
