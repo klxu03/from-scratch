@@ -9,7 +9,6 @@ import time
 import numpy as np
 from utils.graph import create_rolling
 from utils.memory import empty_device_cache, log_memory, print_memory, print_peak_memory, reset_peak_memory
-import random
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 MAX_OUTPUT_TOKENS = 4096
@@ -32,8 +31,8 @@ rolling_avg_path = Path(__file__).resolve().with_name("rolling_avg.jpg")
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 10
-    MEDIUM_PER_BATCH = 4
+    BATCH_SIZE = 12
+    HARDS_PER_BATCH = 2
     GROUP_SIZE = 24
 
     if checkpoint_path is not None:
@@ -46,7 +45,6 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         if line.strip():
             train_data.append(list(map(int, line.split()))) 
 
-    medium_hard_puzzles = train_data[-170:]
     hard_pool = [
         [1, 2, 11, 12],
         [1, 9, 10, 13],
@@ -80,18 +78,21 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     epoch = 0
     while True:
         epoch += 1
-        np.random.shuffle(medium_hard_puzzles)
+        np.random.shuffle(train_data)
+        train_per_batch = BATCH_SIZE - HARDS_PER_BATCH
         for start in tqdm(
-            range(0, len(medium_hard_puzzles) - MEDIUM_PER_BATCH + 1, MEDIUM_PER_BATCH),
+            range(0, len(train_data) - train_per_batch + 1, train_per_batch),
             desc=f"Epoch {epoch} | Training batches",
             position=0,
             leave=True,
             dynamic_ncols=True,
         ):
             print("\n\n")
-            training_batch = [puzzle.copy() for puzzle in medium_hard_puzzles[start:start + MEDIUM_PER_BATCH]]
-            training_batch.extend([hard_pool[update_step % len(hard_pool)].copy()])
-            training_batch.extend(p.copy() for p in random.sample(train_data, BATCH_SIZE - MEDIUM_PER_BATCH - 1))
+            training_batch = [puzzle.copy() for puzzle in train_data[start:start + train_per_batch]]
+            training_batch.extend(
+                hard_pool[(update_step * HARDS_PER_BATCH + offset) % len(hard_pool)].copy()
+                for offset in range(HARDS_PER_BATCH)
+            )
 
             for puzzle in training_batch:
                 np.random.shuffle(puzzle)
@@ -131,7 +132,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
 if __name__ == "__main__":
-    starting_checkpoint = 1557
+    starting_checkpoint = 1722
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
