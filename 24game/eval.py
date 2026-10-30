@@ -334,9 +334,46 @@ if __name__ == "__main__":
     Unsolved after 3 runs: 9/274 [(2, 2, 11, 11), (5, 5, 8, 12), (6, 12, 12, 12), (7, 8, 8, 13), (3, 12, 12, 13), (5, 8, 10, 12), (6, 9, 9, 10), (6, 11, 12, 12), (8, 9, 9, 12)]
     Run 4: easy 198/230, medium 32/40, hard 1/4
     Unsolved after 4 runs: 6/274 [(2, 2, 11, 11), (5, 5, 8, 12), (6, 12, 12, 12), (7, 8, 8, 13), (3, 12, 12, 13), (6, 9, 9, 10)]
+    Run 5: easy 202/230, medium 30/40, hard 3/4
+    Run 6: easy 196/230, medium 32/40, hard 2/4
+    Run 7: easy 192/230, medium 33/40, hard 1/4
+    Unsolved after 7 runs: 2/274 [(5, 5, 8, 12), (6, 9, 9, 10)]
+    Run 8: easy 192/230, medium 33/40, hard 3/4
+    Run 9: easy 196/230, medium 32/40, hard 1/4
+    Run 10: easy 187/230, medium 32/40, hard 1/4
+    Run 11: easy 194/230, medium 32/40, hard 2/4
+    Run 12: easy 191/230, medium 33/40, hard 2/4
+    Unsolved after 12 runs: 1/274 [(5, 5, 8, 12)]
+    Run 13: easy 193/230, medium 31/40, hard 0/4
+    Unsolved after 13 runs: 0/274 []
+    Run 14: easy 197/230, medium 32/40, hard 2/4
+    Run 15: easy 198/230, medium 32/40, hard 1/4
+    Run 16: easy 191/230, medium 30/40, hard 1/4
+
+    Checkpoint 1565:
+    Run 1: easy 184/230, medium 31/40, hard 1/4
+    Run 2: easy 192/230, medium 34/40, hard 1/4
+    Run 3: easy 184/230, medium 33/40, hard 0/4
+    Run 4: easy 184/230, medium 29/40, hard 3/4
+    Unsolved after 4 runs: 6/274 [(3, 3, 7, 13), (7, 8, 8, 13), (7, 8, 9, 12), (2, 9, 13, 13), (4, 6, 7, 9), (8, 9, 9, 12)]
+    Run 5: easy 191/230, medium 33/40, hard 1/4
+    Run 6: easy 194/230, medium 30/40, hard 1/4
+    Run 7: easy 182/230, medium 33/40, hard 2/4
+    Run 8: easy 188/230, medium 30/40, hard 1/4
+    Unsolved after 8 runs: 2/274 [(7, 8, 8, 13), (2, 9, 13, 13)]
+    Run 9: easy 184/230, medium 30/40, hard 1/4
+    Run 10: easy 190/230, medium 30/40, hard 2/4
+    Run 11: easy 188/230, medium 30/40, hard 1/4
+    Run 12: easy 189/230, medium 30/40, hard 1/4
+    Run 13: easy 192/230, medium 34/40, hard 2/4
+    Run 14: easy 185/230, medium 28/40, hard 2/4
+    Run 15: easy 191/230, medium 30/40, hard 2/4
+    Run 16: easy 192/230, medium 27/40, hard 2/4
+
+    Checkpoint 1638:
     """
 
-    CHECKPOINT = 1066
+    CHECKPOINT = 1638
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
@@ -347,12 +384,6 @@ if __name__ == "__main__":
     print(f"Success count: {success_count}")
 
     for puzzle, success in puzzle_success_rate.items():
-        if success <= RUNS_PER_PUZZLE // 2:
-            print(f"Puzzle {puzzle} ({puzzle_splits[puzzle]}) succeeded {success} times")
-
-    sorted_puzzles = sorted(puzzle_success_rate.items(), key=lambda x: x[1])
-    print("30 puzzles with the lowest success rates:")
-    for puzzle, success in sorted_puzzles[:30]:
         print(f"Puzzle {puzzle} ({puzzle_splits[puzzle]}) succeeded {success} times")
 
     # solve([8, 1, 5, 4], checkpoint_path)
