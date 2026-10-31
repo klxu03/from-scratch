@@ -140,7 +140,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         # Puzzles under 50% join the pool. A pooled puzzle leaves only after it is seen
         # enough times and solved on at least 70% of those rollouts.
         for puzzle, (successes, seen) in puzzle_counts.items():
-            if seen > 0 and successes / seen < 0.5:
+            if seen > 0 and successes / seen <= 0.5:
                 puzzle_list = list(puzzle)
                 if puzzle_list in hard_pool:
                     hard_pool.remove(puzzle_list)
@@ -148,7 +148,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         kept = []
         for puzzle in hard_pool:
             successes, seen = puzzle_counts.get(tuple(sorted(puzzle)), (0, 0))
-            if seen <= 2 * GROUP_SIZE or successes / seen < 0.7:
+            if seen <= 2 * GROUP_SIZE or successes / seen <= 0.7:
                 kept.append(puzzle)
                 print(f"Puzzle {puzzle} added to hard pool")
         hard_pool = kept
