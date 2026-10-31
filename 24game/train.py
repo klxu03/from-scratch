@@ -74,6 +74,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         epoch += 1
         np.random.shuffle(train_data)
         train_per_batch = BATCH_SIZE - HARDS_PER_BATCH
+        HARDS_THIS_BATCH = min(HARDS_PER_BATCH, len(hard_pool))
         for start in tqdm(
             range(0, len(train_data), train_per_batch),
             desc=f"Epoch {epoch} | Training batches",
@@ -83,10 +84,11 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         ):
             print("\n\n")
             training_batch = [puzzle.copy() for puzzle in train_data[start:start + train_per_batch]]
-            training_batch.extend(
-                hard_pool[(update_step * HARDS_PER_BATCH + offset) % len(hard_pool)].copy()
-                for offset in range(HARDS_PER_BATCH)
-            )
+            if hard_pool:
+                training_batch.extend(
+                    hard_pool[(update_step * HARDS_THIS_BATCH + offset) % len(hard_pool)].copy()
+                    for offset in range(HARDS_THIS_BATCH)
+                )
 
             for puzzle in training_batch:
                 np.random.shuffle(puzzle)
@@ -131,15 +133,20 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
 
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
-        # update hard pool based on puzzle counts
+        # Puzzles under 50% join the pool. A pooled puzzle leaves only after it is seen
+        # enough times and solved on at least 70% of those rollouts.
         for puzzle, (successes, seen) in puzzle_counts.items():
-            if float(successes) / seen < 0.5:
-                if list(puzzle) in hard_pool: hard_pool.remove(list(puzzle))
-                hard_pool.append(list(puzzle))
+            if seen > 0 and successes / seen < 0.5:
+                puzzle_list = list(puzzle)
+                if puzzle_list in hard_pool:
+                    hard_pool.remove(puzzle_list)
+                hard_pool.append(puzzle_list)
+        kept = []
         for puzzle in hard_pool:
             successes, seen = puzzle_counts.get(tuple(sorted(puzzle)), (0, 0))
-            if float(successes) / seen < 0.7 and seen > 2 * GROUP_SIZE:
-                hard_pool.remove(puzzle)
+            if seen <= 2 * GROUP_SIZE or successes / seen < 0.7:
+                kept.append(puzzle)
+        hard_pool = kept
 
 
 if __name__ == "__main__":
