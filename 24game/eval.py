@@ -402,9 +402,31 @@ if __name__ == "__main__":
     Run 16: easy 205/230, medium 30/40, hard 2/4
 
     ** Checkpoint 1722 changed data mixture to 10 epoch puzzles + 2 hards
+
+    Checkpoint 1797:
+    Run 1: easy 194/230, medium 31/40, hard 1/4
+    Run 2: easy 194/230, medium 31/40, hard 0/4
+    Run 3: easy 200/230, medium 31/40, hard 2/4
+    Unsolved after 3 runs: 10/274 [(2, 4, 7, 12), (1, 6, 10, 12), (1, 3, 7, 8), (5, 5, 8, 12), (3, 3, 7, 13), (2, 2, 11, 11), (8, 9, 9, 12), (1, 7, 12, 13), (2, 9, 9, 13), (2, 2, 13, 13)]
+    Run 4: easy 196/230, medium 25/40, hard 2/4
+    Unsolved after 4 runs: 4/274 [(1, 6, 10, 12), (3, 3, 7, 13), (2, 2, 11, 11), (2, 9, 9, 13)]
+    Run 5: easy 203/230, medium 30/40, hard 1/4
+    Unsolved after 5 runs: 2/274 [(3, 3, 7, 13), (2, 2, 11, 11)]
+    Run 6: easy 193/230, medium 28/40, hard 2/4
+    Run 7: easy 197/230, medium 28/40, hard 0/4
+    Run 8: easy 203/230, medium 25/40, hard 1/4
+    Run 9: easy 202/230, medium 33/40, hard 0/4
+    Run 10: easy 194/230, medium 32/40, hard 0/4
+    Run 11: easy 198/230, medium 29/40, hard 1/4
+    Run 12: easy 186/230, medium 31/40, hard 0/4
+    Run 13: easy 202/230, medium 34/40, hard 0/4
+    Run 14: easy 209/230, medium 28/40, hard 0/4
+    Run 15: easy 202/230, medium 29/40, hard 0/4
+    Run 16: easy 199/230, medium 33/40, hard 0/4
+    Unsolved after 16 runs: 2/274 [(3, 3, 7, 13), (2, 2, 11, 11)]
     """
 
-    CHECKPOINT = 1698
+    CHECKPOINT = 1797
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")

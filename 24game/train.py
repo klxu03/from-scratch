@@ -31,9 +31,9 @@ rolling_avg_path = Path(__file__).resolve().with_name("rolling_avg.jpg")
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 12
-    HARDS_PER_BATCH = 2
-    GROUP_SIZE = 24
+    BATCH_SIZE = 18
+    HARDS_PER_BATCH = 8
+    GROUP_SIZE = 16
 
     if checkpoint_path is not None:
         print(f"Loading checkpoint from {checkpoint_path}")
@@ -68,9 +68,9 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
     log_memory(0, "initialized", model.device, _MEMORY_CSV)
 
     update_step = initial_update_step
-    # for epoch in range(EPOCHS):
     epoch = 0
     while True:
+        puzzle_counts: dict[tuple[int, int, int, int], tuple[int, int]] = {}
         epoch += 1
         np.random.shuffle(train_data)
         train_per_batch = BATCH_SIZE - HARDS_PER_BATCH
@@ -105,6 +105,12 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             avg_reward = learner.step() / (GROUP_SIZE * len(training_batch))
             log_memory(update_step + 1, device=model.device, csv_path=_MEMORY_CSV)
             step_time = time.time()
+
+            for puzzle, group in zip(training_batch, rollouts):
+                key = tuple(sorted(puzzle))
+                successes, seen = puzzle_counts.get(key, (0, 0))
+                puzzle_counts[key] = (successes + sum(rollout.reward for rollout in group), seen + len(group))
+
             avg_rewards.append(avg_reward)
             with avg_reward_csv_path.open("a") as f:
                 f.write(f"{avg_reward:.6g}\n")
@@ -125,8 +131,19 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
 
             learner.create_checkpoint(Path(__file__).resolve().parent / "checkpoints" / f"checkpoint_{(update_step := update_step + 1)}.pt")
 
+        # update hard pool based on puzzle counts
+        for puzzle, (successes, seen) in puzzle_counts.items():
+            if float(successes) / seen < 0.5:
+                if list(puzzle) in hard_pool: hard_pool.remove(list(puzzle))
+                hard_pool.append(list(puzzle))
+        for puzzle in hard_pool:
+            successes, seen = puzzle_counts.get(tuple(sorted(puzzle)), (0, 0))
+            if float(successes) / seen < 0.7 and seen > 2 * GROUP_SIZE:
+                hard_pool.remove(puzzle)
+
+
 if __name__ == "__main__":
-    starting_checkpoint = 1722
+    starting_checkpoint = 1814
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
