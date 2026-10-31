@@ -46,22 +46,26 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             train_data.append(list(map(int, line.split()))) 
 
     hard_pool = [
-        [2, 5, 5, 10],   [1, 9, 10, 13],
-        [1, 4, 5, 6],    [3, 4, 7, 8],
-        [2, 4, 10, 10],  [3, 5, 8, 12],
-        [2, 5, 7, 8],    [7, 10, 10, 12],
-        [1, 3, 4, 6],    [4, 8, 8, 9],
-        [1, 8, 12, 12],  [3, 5, 7, 13],
-        [2, 3, 5, 12],   [4, 5, 6, 13],
-        [6, 7, 8, 12],   [8, 9, 10, 12],
-        [2, 7, 7, 10],   [1, 2, 11, 12],
-        [3, 3, 7, 7],    [2, 2, 10, 11],
-        [3, 3, 8, 8],    [4, 8, 8, 11],
-        [1, 4, 7, 11],   [8, 9, 11, 11],
+        [1, 2, 11, 12],  [1, 3, 4, 6],
+        [1, 4, 5, 6],    [1, 4, 7, 11],
+        [1, 6, 11, 13],  [1, 8, 12, 12],
+        [1, 9, 10, 13],  [1, 9, 12, 12],
+        [2, 2, 10, 11],  [2, 2, 12, 13],
+        [2, 3, 5, 12],   [2, 4, 10, 10],
+        [2, 5, 5, 10],   [2, 5, 7, 8],
+        [2, 5, 8, 12],   [2, 7, 7, 10],
+        [3, 3, 5, 7],    [3, 3, 7, 7],
+        [3, 3, 8, 8],    [3, 5, 7, 13],
+        [3, 5, 8, 12],   [3, 6, 6, 10],
+        [3, 6, 6, 11],   [3, 11, 12, 12],
         [4, 4, 7, 7],    [4, 6, 6, 10],
-        [5, 5, 7, 11],   [3, 6, 6, 10],
-        [5, 7, 7, 11],   [2, 5, 8, 12],
-        [4, 7, 11, 12],  [7, 8, 8, 12],
+        [4, 7, 11, 12],  [4, 8, 8, 11],
+        [5, 5, 7, 11],   [5, 6, 10, 12],
+        [5, 7, 7, 11],   [5, 7, 9, 12],
+        [5, 8, 12, 12],  [6, 7, 8, 12],
+        [7, 8, 8, 12],   [7, 8, 10, 11],
+        [7, 10, 10, 12], [7, 10, 12, 13],
+        [8, 9, 10, 12],  [8, 9, 11, 11],
     ]
     avg_rewards = initial_avg_rewards
 
@@ -146,11 +150,13 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
             successes, seen = puzzle_counts.get(tuple(sorted(puzzle)), (0, 0))
             if seen <= 2 * GROUP_SIZE or successes / seen < 0.7:
                 kept.append(puzzle)
+                print(f"Puzzle {puzzle} added to hard pool")
         hard_pool = kept
+        np.random.shuffle(hard_pool)
 
 
 if __name__ == "__main__":
-    starting_checkpoint = 1814
+    starting_checkpoint = 1816
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
