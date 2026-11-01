@@ -28,7 +28,7 @@ image = image.add_local_dir(REPO_ROOT / "utils", "/root/utils")
 
 @app.function(
     image=image,
-    gpu="A100-40GB",
+    gpu="A100-80GB",
     cpu=2,
     memory=4096,
     max_containers=1,

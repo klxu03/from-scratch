@@ -6,6 +6,7 @@ import re
 
 def calculator(expression: str) -> str:
     """Evaluate an arithmetic expression using +, -, *, / and parentheses.
+    The calculator will return both the result as well as process the input numbers given and return numbers used with feedback about missing or extra numbers not in the original puzzle.
 
     Args:
         expression: Expression to evaluate, e.g. "(6 * 12) / (4 + 4)".
@@ -18,10 +19,10 @@ def calculator(expression: str) -> str:
     }
 
     if len(expression) > 128:
-        raise ValueError("Expression too long")
+        return "ERROR: Expression too long"
 
     if "#" in expression or "=" in expression:
-        raise ValueError("Comments and equality signs are not allowed")
+        return "ERROR: Comments and equality signs are not allowed"
 
     tree = ast.parse(expression, mode="eval")
 
@@ -38,7 +39,7 @@ def calculator(expression: str) -> str:
             value = evaluate(node.operand)
             return value if isinstance(node.op, ast.UAdd) else -value
 
-        raise ValueError("Only arithmetic expressions are allowed")
+        return "ERROR: Only arithmetic expressions are allowed"
 
     return str(evaluate(tree.body))
 
@@ -61,7 +62,7 @@ def numbers_used(expression: str) -> list[int]:
 
 def verify_solution(expression: str, puzzle: list[int]) -> bool:
     parts = expression.split(" = ")
-    if len(parts) != 2:
+    if len(parts) != 2 or "ERROR" in expression:
         return False
     expression, result = parts
 
@@ -86,16 +87,23 @@ def execute_tools(text: str, puzzle: list[int]) -> list[str]:
         expression = raw_expression.strip().strip("\"'")
         try:
             result = calculator(expression)
-        except Exception as ignored:
-            continue
+        except Exception as err:
+            result = f"ERROR: expression got error {err}"
 
         print(f"Calculator {expression} = {result}")
-        ret.append(f"{expression} = {result}")
+        if "ERROR" in result:
+            ret.append(result)
+        else:
+            ret.append(f"{expression} = {result}")
     return ret
 
 def tool_response(tool_results: list[str], puzzle: list[int]) -> list[str]:
     responses = []
     for result in tool_results:
+        if "ERROR" in result:
+            responses.append(result)
+            continue
+
         expression, _, value = result.partition(" = ")
         used = numbers_used(expression)
         if used is False:

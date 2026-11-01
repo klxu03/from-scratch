@@ -10,7 +10,7 @@ from lora_linear import apply_lora
 from utils.memory import empty_device_cache
 
 MODEL = "Qwen/Qwen3.5-0.8B"
-MAX_OUTPUT_TOKENS = 4096
+MAX_OUTPUT_TOKENS = 8192
 DEVICE = (
     torch.device("cuda") if torch.cuda.is_available()
     else torch.device("mps") if torch.backends.mps.is_available()
@@ -475,6 +475,8 @@ if __name__ == "__main__":
     Run 14: easy 198/230, medium 28/40, hard 1/4
     Run 15: easy 197/230, medium 30/40, hard 1/4
     Run 16: easy 195/230, medium 25/40, hard 1/4
+
+    Checkpoint 1927: Trying 8096 token max limit, longer prompt utilizing more token budget, env gives more feedback on invalid inputs
     """
 
     CHECKPOINT = 1911
