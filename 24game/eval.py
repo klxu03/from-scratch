@@ -424,9 +424,32 @@ if __name__ == "__main__":
     Run 15: easy 202/230, medium 29/40, hard 0/4
     Run 16: easy 199/230, medium 33/40, hard 0/4
     Unsolved after 16 runs: 2/274 [(3, 3, 7, 13), (2, 2, 11, 11)]
+
+    ** Checkpoint 1816 added dynamic hard pool, batch size 18 and 10 forced hards
+    
+    Checkpoint 1855:
+    Run 1: easy 195/230, medium 29/40, hard 1/4
+    Run 2: easy 194/230, medium 32/40, hard 2/4
+    Run 3: easy 194/230, medium 33/40, hard 2/4
+    Run 4: easy 198/230, medium 26/40, hard 1/4
+    Unsolved after 4 runs: 5/274 [(5, 5, 8, 12), (4, 5, 6, 12), (2, 2, 11, 11), (3, 9, 9, 10), (8, 9, 9, 12)]
+    Run 5: easy 189/230, medium 31/40, hard 0/4
+    Run 6: easy 206/230, medium 30/40, hard 3/4
+    Unsolved after 6 runs: 2/274 [(5, 5, 8, 12), (2, 2, 11, 11)]
+    Run 7: easy 203/230, medium 29/40, hard 1/4
+    Run 8: easy 189/230, medium 24/40, hard 3/4
+    Run 9: easy 196/230, medium 30/40, hard 1/4
+    Unsolved after 9 runs: 0/274 []
+    Run 10: easy 193/230, medium 27/40, hard 3/4
+    Run 11: easy 196/230, medium 33/40, hard 2/4
+    Run 12: easy 194/230, medium 27/40, hard 1/4
+    Run 13: easy 202/230, medium 29/40, hard 0/4
+    Run 14: easy 199/230, medium 26/40, hard 1/4
+    Run 15: easy 194/230, medium 31/40, hard 0/4
+    Run 16: easy 195/230, medium 28/40, hard 3/4
     """
 
-    CHECKPOINT = 1797
+    CHECKPOINT = 1855
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
