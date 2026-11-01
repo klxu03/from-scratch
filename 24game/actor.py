@@ -230,7 +230,13 @@ class Actor:
                 continue
 
             feedback = tool_response(tool_results, self.rollout_manager(rollout_id).puzzle)
-            if not tool_results: feedback = ["No valid calculator call waas found. If you identified a candidate, submit now to the calculator. Don't keep reasoning without testing it."]
+            if not tool_results: 
+                feedback = ["""
+No calculator request was received. Your candidate has NOT been evaluated, so this is not evidence that it is wrong.
+
+If you identified a complete expression, submit that exact expression now.
+Do not change it merely because no tool result was returned.
+                """]
 
             next_prompt = continuation_suffix(self.tokenizer, rollout.turns[-1].token_ids, feedback)
             next_prompt_ids = self.tokenizer(next_prompt, add_special_tokens=False, return_tensors="pt")["input_ids"].squeeze(0)

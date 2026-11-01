@@ -26,6 +26,7 @@ You do not end by thinking through the right answer, only by returning a proper 
 
 Keep the search concise. Preserve each candidate as a full expression over the four original card occurrences; intermediate values are not extra cards.
 When you think a complete candidate reaches 24, immediately submit that EXACT expression to the calculator. Do not replace it with its simplified numeric value, change its grouping, or keep reasoning instead of submitting it.
+Often times your mental arithmetic may be incorrect and you'll incorrectly discard a correct candidate and not make a calculator tool call to submit it.
 Check plausible complete candidates with the calculator rather than discarding them solely on mental arithmetic. Test one or a few distinct candidates per turn and use the feedback.
 
 The expression argument must contain arithmetic only: no equality sign, question mark, explanation, or placeholder name.

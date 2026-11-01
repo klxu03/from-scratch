@@ -20,7 +20,7 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-actor = Actor(model, MAX_OUTPUT_TOKENS)
+actor = Actor(model, max_output_tokens=MAX_OUTPUT_TOKENS, tail_threshold=32)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 EASY_PUZZLES = Path(__file__).resolve().parent / "data/easy.jsonl"
@@ -477,6 +477,12 @@ if __name__ == "__main__":
     Run 16: easy 195/230, medium 25/40, hard 1/4
 
     Checkpoint 1927: Trying 8096 token max limit, longer prompt utilizing more token budget, env gives more feedback on invalid inputs
+    Run 1: easy 213/230, medium 32/40, hard 1/4
+    Run 2: easy 215/230, medium 34/40, hard 2/4
+    Run 3: easy 208/230, medium 33/40, hard 1/4
+
+    Checkpoint 1931:
+
     """
 
     CHECKPOINT = 1927

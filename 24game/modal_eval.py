@@ -89,12 +89,14 @@ def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str) -> int:
         cache_volume.commit()  # Persist traces/report and checkpoint deletion.
 
 
-# Run from the repository root:
-# uv run --with modal python 24game/modal_eval.py \
-#     --checkpoint 24game/checkpoints/checkpoint_1927.pt \
-#     --split both \
-#     --runs 16
-# Use --split val or --split test to evaluate only one split.
+"""
+Run from the repository root:
+uv run --with modal python 24game/modal_eval.py \
+    --checkpoint 24game/checkpoints/checkpoint_1931.pt \
+    --split both \
+    --runs 16
+Use --split val or --split test to evaluate only one split.
+"""
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True)

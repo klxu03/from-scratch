@@ -90,7 +90,7 @@ def execute_tools(text: str, puzzle: list[int]) -> list[str]:
         except Exception as err:
             result = f"ERROR: expression got error {err}"
 
-        print(f"Calculator {expression} = {result}")
+        print(f"Calculator {expression} has result: {result}")
         if "ERROR" in result:
             ret.append(result)
         else:
@@ -112,6 +112,7 @@ def tool_response(tool_results: list[str], puzzle: list[int]) -> list[str]:
         missing = list((Counter(puzzle) - Counter(used)).elements())
         extra = list((Counter(used) - Counter(puzzle)).elements())
         lines = [
+            f"Expression checked: {expression}",
             f"Calculator result: {value}",
             f"Numbers used: {used}",
         ]
