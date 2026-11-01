@@ -91,7 +91,7 @@ def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str) -> int:
 
 # Run from the repository root:
 # uv run --with modal python 24game/modal_eval.py \
-#     --checkpoint 24game/checkpoints/checkpoint_1911.pt \
+#     --checkpoint 24game/checkpoints/checkpoint_1927.pt \
 #     --split both \
 #     --runs 16
 # Use --split val or --split test to evaluate only one split.

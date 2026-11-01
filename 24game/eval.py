@@ -479,7 +479,7 @@ if __name__ == "__main__":
     Checkpoint 1927: Trying 8096 token max limit, longer prompt utilizing more token budget, env gives more feedback on invalid inputs
     """
 
-    CHECKPOINT = 1911
+    CHECKPOINT = 1927
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
