@@ -477,12 +477,37 @@ if __name__ == "__main__":
     Run 16: easy 195/230, medium 25/40, hard 1/4
 
     Checkpoint 1927: Trying 8096 token max limit, longer prompt utilizing more token budget, env gives more feedback on invalid inputs
+    Collected rollouts in 1249.19 seconds
     Run 1: easy 213/230, medium 32/40, hard 1/4
+    Collected rollouts in 922.89 seconds
     Run 2: easy 215/230, medium 34/40, hard 2/4
+    Collected rollouts in 987.41 seconds
     Run 3: easy 208/230, medium 33/40, hard 1/4
 
-    Checkpoint 1931:
-
+    Checkpoint 1932:
+    Collected rollouts in 886.61 seconds
+    Run 1: easy 210/230, medium 34/40, hard 2/4
+    Unsolved after 1 runs: 28/274 [(3, 3, 4, 4), (6, 8, 8, 8), (4, 10, 12, 13), (5, 7, 10, 10), (1, 2, 8, 10), (2, 2, 7, 12), (3, 6, 7, 12), (7, 8, 8, 13), (1, 3, 7, 8), (1, 4, 5, 13), (8, 9, 11, 13), (6, 8, 9, 10), (5, 5, 8, 12), (4, 5, 6, 12), (3, 3, 7, 13), (3, 9, 9, 10), (1, 3, 5, 7), (3, 12, 12, 13), (2, 4, 8, 13), (5, 6, 9, 12), (2, 3, 11, 13), (5, 5, 10, 10), (2, 2, 5, 8), (4, 7, 13, 13), (2, 9, 13, 13), (3, 4, 4, 4), (2, 2, 13, 13), (1, 6, 6, 8)]
+    Collected rollouts in 834.99 seconds
+    Run 2: easy 214/230, medium 33/40, hard 1/4
+    Unsolved after 2 runs: 8/274 [(3, 6, 7, 12), (7, 8, 8, 13), (3, 3, 7, 13), (3, 9, 9, 10), (2, 9, 13, 13), (3, 4, 4, 4), (2, 2, 13, 13), (1, 6, 6, 8)]
+    Run 3: easy 220/230, medium 33/40, hard 2/4
+    Unsolved after 3 runs: 2/274 [(3, 3, 7, 13), (2, 2, 13, 13)]
+    Run 4: easy 211/230, medium 38/40, hard 1/4
+    Unsolved after 4 runs: 1/274 [(2, 2, 13, 13)]
+    Run 5: easy 214/230, medium 33/40, hard 3/4
+    Unsolved after 5 runs: 0/274 []
+    Run 6: easy 206/230, medium 37/40, hard 3/4
+    Run 7: easy 215/230, medium 31/40, hard 2/4
+    Run 8: easy 221/230, medium 35/40, hard 2/4
+    Run 9: easy 213/230, medium 35/40, hard 1/4
+    Run 10: easy 213/230, medium 34/40, hard 1/4
+    Run 11: easy 207/230, medium 34/40, hard 2/4
+    Run 12: easy 214/230, medium 34/40, hard 1/4
+    Run 13: easy 216/230, medium 35/40, hard 2/4
+    Run 14: easy 216/230, medium 34/40, hard 2/4
+    Run 15: easy 219/230, medium 34/40, hard 3/4
+    Run 16: easy 215/230, medium 35/40, hard 1/4
     """
 
     CHECKPOINT = 1927

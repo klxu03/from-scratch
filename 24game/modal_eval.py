@@ -35,13 +35,13 @@ image = image.add_local_dir(REPO_ROOT / "utils", "/root/utils")
     timeout=12 * 3600,
     volumes={"/vol": cache_volume},
 )
-def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str) -> int:
+def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str, is_checkpoint_empty: bool) -> int:
     checkpoint_path = Path("/vol/checkpoints") / f"{job_id}_{checkpoint_name}"
 
     try:
         # A reused container may have mounted the Volume before this upload.
         cache_volume.reload()
-        if not checkpoint_path.is_file():
+        if not is_checkpoint_empty and not checkpoint_path.is_file():
             raise FileNotFoundError(checkpoint_path)
 
         sys.path[:0] = ["/root/24game", "/root"]
@@ -58,7 +58,11 @@ def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str) -> int:
         data_path = (
             None if split == "both" else Path(f"/root/24game/data/{split}.jsonl")
         )
-        rewards = game_eval.eval(checkpoint_path, data_path, runs_per_puzzle=runs)
+        rewards = game_eval.eval(
+            None if is_checkpoint_empty else checkpoint_path,
+            data_path,
+            runs_per_puzzle=runs,
+        )
         solved = sum(score > 0 for score in rewards.values())
 
         report = {
@@ -85,41 +89,55 @@ def run_eval(checkpoint_name: str, split: str, runs: int, job_id: str) -> int:
         return solved
 
     finally:
-        checkpoint_path.unlink(missing_ok=True)
+        if not is_checkpoint_empty:
+            checkpoint_path.unlink(missing_ok=True)
         cache_volume.commit()  # Persist traces/report and checkpoint deletion.
 
 
 """
 Run from the repository root:
 uv run --with modal python 24game/modal_eval.py \
-    --checkpoint 24game/checkpoints/checkpoint_1931.pt \
+    --checkpoint 24game/checkpoints/checkpoint_1932.pt \
     --split both \
     --runs 16
 Use --split val or --split test to evaluate only one split.
+
+Omit --checkpoint to evaluate the base Qwen model:
+uv run --with modal python 24game/modal_eval.py \
+    --split both \
+    --runs 4
 """
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--checkpoint")
     parser.add_argument("--split", choices=["both", "val", "test"], default="both")
     parser.add_argument("--runs", type=int, default=16)
     args = parser.parse_args()
 
-    checkpoint = Path(args.checkpoint).expanduser().resolve()
-    if not checkpoint.is_file():
-        parser.error(f"Checkpoint not found: {checkpoint}")
+    is_checkpoint_empty = args.checkpoint is None
+    if is_checkpoint_empty:
+        checkpoint_name = "base"
+    else:
+        checkpoint = Path(args.checkpoint).expanduser().resolve()
+        if not checkpoint.is_file():
+            parser.error(f"Checkpoint not found: {checkpoint}")
+        checkpoint_name = checkpoint.name
     if args.runs < 1:
         parser.error("--runs must be at least 1")
 
     # Unique staging name avoids collisions between simultaneous submissions.
     job_id = uuid4().hex[:12]
     with modal.enable_output(), app.run(detach=True):
-        with cache_volume.batch_upload() as batch:
-            batch.put_file(str(checkpoint), f"/checkpoints/{job_id}_{checkpoint.name}")
+        if not is_checkpoint_empty:
+            with cache_volume.batch_upload() as batch:
+                batch.put_file(str(checkpoint), f"/checkpoints/{job_id}_{checkpoint_name}")
 
-        call = run_eval.spawn(checkpoint.name, args.split, args.runs, job_id)
-        print(f"Submitted: {checkpoint.name} (job {job_id})")
+        call = run_eval.spawn(
+            checkpoint_name, args.split, args.runs, job_id, is_checkpoint_empty
+        )
+        print(f"Submitted: {checkpoint_name} (job {job_id})")
         print(f"Function call ID: {call.object_id}")
         print(f"Logs: {call.get_dashboard_url()}")
-    
+
 if __name__ == "__main__":
     main()

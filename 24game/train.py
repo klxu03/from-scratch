@@ -22,7 +22,7 @@ if DEVICE.type == "cuda":
     torch.set_float32_matmul_precision("high")
 model = Qwen3_5ForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16).to(DEVICE)
 model = apply_lora(model)
-actor = Actor(model, MAX_OUTPUT_TOKENS)
+actor = Actor(model, max_output_tokens=MAX_OUTPUT_TOKENS, tail_threshold=32)
 learner = Learner(model, MAX_OUTPUT_TOKENS)
 
 avg_reward_path = Path(__file__).resolve().with_name("average_reward.jpg")
@@ -31,8 +31,8 @@ rolling_avg_path = Path(__file__).resolve().with_name("rolling_avg.jpg")
 _MEMORY_CSV = Path(__file__).resolve().with_name("memory_debug.csv")
 
 def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, initial_avg_rewards: list[float] = []):
-    BATCH_SIZE = 20
-    HARDS_PER_BATCH = 6
+    BATCH_SIZE = 12
+    HARDS_PER_BATCH = 5
     GROUP_SIZE = 16
 
     if checkpoint_path is not None:
@@ -45,31 +45,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
         if line.strip():
             train_data.append(list(map(int, line.split()))) 
 
-    hard_pool = [
-        [1, 2, 11, 12],  [1, 3, 4, 6],
-        [1, 4, 5, 6],    [1, 4, 6, 10],
-        [1, 4, 7, 11],   [1, 6, 11, 13],
-        [1, 8, 12, 12],  [1, 9, 10, 13],
-        [1, 9, 12, 12],  [2, 2, 10, 11],
-        [2, 2, 12, 13],  [2, 3, 5, 12],
-        [2, 4, 10, 10],  [2, 5, 5, 10],
-        [2, 5, 7, 8],    [2, 5, 8, 12],
-        [2, 7, 7, 10],   [3, 3, 5, 7],
-        [3, 3, 7, 7],    [3, 3, 8, 8],
-        [3, 5, 7, 13],   [3, 5, 8, 12],
-        [3, 6, 6, 10],   [3, 6, 6, 11],
-        [3, 11, 12, 12], [4, 4, 7, 7],
-        [4, 6, 6, 10],   [4, 7, 11, 12],
-        [4, 8, 8, 11],   [5, 5, 7, 11],
-        [5, 5, 9, 9],    [5, 6, 7, 7],
-        [5, 6, 10, 12],  [5, 7, 7, 11],
-        [5, 7, 9, 12],   [5, 7, 10, 11],
-        [5, 8, 12, 12],  [6, 7, 8, 12],
-        [7, 8, 8, 12],   [7, 8, 10, 11],
-        [7, 10, 10, 12], [7, 10, 12, 13],
-        [8, 9, 10, 12],  [8, 9, 11, 11],
-        [9, 12, 12, 12],
-    ]
+    hard_pool = [[2, 3, 5, 12], [2, 4, 10, 10], [2, 7, 7, 10], [3, 3, 5, 7], [3, 6, 6, 11], [4, 4, 7, 7], [4, 6, 6, 10], [4, 8, 8, 11], [5, 5, 7, 11], [5, 7, 7, 11], [5, 8, 12, 12], [7, 8, 8, 12], [7, 10, 10, 12], [8, 9, 11, 11], [3, 6, 7, 10], [1, 4, 6, 10], [1, 4, 7, 11], [1, 6, 11, 13], [1, 8, 12, 12], [1, 9, 12, 12], [3, 9, 10, 10], [2, 2, 10, 11], [2, 2, 12, 13], [2, 5, 5, 10], [2, 5, 7, 8], [6, 7, 8, 12], [2, 5, 8, 12], [3, 5, 7, 13], [3, 5, 8, 12], [3, 6, 6, 10], [3, 11, 12, 12], [5, 6, 10, 12], [7, 10, 12, 13], [5, 7, 9, 12], [5, 7, 10, 11], [2, 2, 4, 12], [7, 8, 10, 11], [2, 10, 10, 11], [4, 5, 6, 8], [1, 3, 8, 9], [1, 4, 5, 6], [1, 8, 11, 12], [1, 3, 13, 13], [1, 2, 7, 12], [3, 3, 6, 8], [1, 6, 8, 8], [2, 8, 8, 11], [3, 5, 10, 10], [3, 5, 12, 13], [7, 7, 9, 10], [6, 8, 9, 12], [1, 11, 12, 12], [2, 2, 3, 5], [5, 9, 10, 11], [1, 3, 8, 10], [2, 3, 8, 13], [3, 6, 11, 13], [2, 7, 12, 12], [1, 1, 1, 11], [7, 7, 8, 11], [5, 8, 9, 13], [4, 7, 8, 10], [2, 4, 5, 10], [2, 8, 12, 13], [5, 9, 12, 12], [3, 4, 6, 13], [1, 2, 7, 7], [1, 1, 6, 12], [9, 11, 12, 13], [1, 4, 9, 13], [2, 3, 9, 12], [6, 7, 11, 11], [4, 5, 6, 11], [4, 7, 9, 11], [3, 7, 9, 13], [2, 10, 10, 13], [4, 5, 5, 8], [5, 6, 8, 13], [2, 2, 6, 7], [2, 5, 6, 9], [2, 2, 7, 10], [8, 10, 12, 13], [5, 5, 8, 8], [2, 4, 7, 7], [2, 6, 9, 10], [3, 7, 7, 9], [6, 7, 10, 10], [1, 1, 1, 13], [2, 6, 7, 12], [3, 5, 8, 13], [5, 7, 7, 10], [1, 11, 13, 13]]
     avg_rewards = initial_avg_rewards
 
     log_memory(0, "initialized", model.device, _MEMORY_CSV)
@@ -159,7 +135,7 @@ def train(checkpoint_path: Path | None = None, initial_update_step: int = 0, ini
 
 
 if __name__ == "__main__":
-    starting_checkpoint = 1868
+    starting_checkpoint = 1932
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/notable/checkpoint_{starting_checkpoint}.pt"
     initial_avg_rewards = (
         [float(x) for x in avg_reward_csv_path.read_text().splitlines() if x.strip()]
