@@ -99,7 +99,7 @@ Run from the repository root:
 uv run --with modal python 24game/modal_eval.py \
     --checkpoint 24game/checkpoints/checkpoint_2048.pt \
     --split both \
-    --runs 16
+    --runs 8
 Use --split val or --split test to evaluate only one split.
 
 Omit --checkpoint to evaluate the base Qwen model:
@@ -107,9 +107,9 @@ uv run --with modal python 24game/modal_eval.py \
     --split both \
     --runs 4
 
-uv run modal app logs ap-XKEBcWDFcKR6q7C7ri23Og \
+uv run modal app logs ap-<app_id> \
   --function-call fc-<function_call_id> \
-  --since 2026-11-02T15:00:00-05:00 \
+  --since 2026-11-02T20:55:00-05:00 \
   | grep -i "run"
 """
 def main() -> None:

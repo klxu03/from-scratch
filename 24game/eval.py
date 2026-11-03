@@ -516,12 +516,26 @@ if __name__ == "__main__":
     Run 4: easy 108/230, medium 8/40, hard 0/4
 
     Checkpoint 2048:
-
+    Run 1: easy 221/230, medium 35/40, hard 2/4
+    Run 2: easy 217/230, medium 34/40, hard 1/4
+    Unsolved after 2 runs: 5/274 [(1, 2, 8, 10), (4, 5, 6, 12), (6, 11, 12, 12), (2, 2, 13, 13), (1, 6, 6, 8)]
+    Run 3: easy 219/230, medium 34/40, hard 2/4
+    Unsolved after 3 runs: 2/274 [(6, 11, 12, 12), (1, 6, 6, 8)]
+    Run 4: easy 216/230, medium 34/40, hard 3/4
+    Unsolved after 4 runs: 0/274 []
+    Run 5: easy 217/230, medium 36/40, hard 1/4
+    Run 6: easy 212/230, medium 36/40, hard 2/4
+    Run 7: easy 217/230, medium 35/40, hard 2/4
+    Run 8: easy 214/230, medium 31/40, hard 1/4
 
     ** Checkpoint 2048 I'm doing an aggressive ~80% hard pool and lowered learning rate to 5e-6
+
+    Checkpoint 2104:
+    Run 1: easy 212/230, medium 33/40, hard 2/4
+    Run 2: easy 193/230, medium 32/40, hard 3/4
     """
 
-    CHECKPOINT = 1927
+    CHECKPOINT = 2104
     checkpoint_path = Path(__file__).resolve().parent / f"checkpoints/checkpoint_{CHECKPOINT}.pt"
 
     print(f"Evaluating checkpoint {CHECKPOINT}")
