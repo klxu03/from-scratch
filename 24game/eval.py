@@ -508,6 +508,17 @@ if __name__ == "__main__":
     Run 14: easy 216/230, medium 34/40, hard 2/4
     Run 15: easy 219/230, medium 34/40, hard 3/4
     Run 16: easy 215/230, medium 35/40, hard 1/4
+
+    Base:
+    Run 1: easy 106/230, medium 8/40, hard 0/4
+    Run 2: easy 111/230, medium 13/40, hard 0/4
+    Run 3: easy 115/230, medium 11/40, hard 0/4
+    Run 4: easy 108/230, medium 8/40, hard 0/4
+
+    Checkpoint 2048:
+
+
+    ** Checkpoint 2048 I'm doing an aggressive ~80% hard pool and lowered learning rate to 5e-6
     """
 
     CHECKPOINT = 1927
